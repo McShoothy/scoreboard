@@ -9,7 +9,8 @@ qrcode[pil]==7.4.2
 
 # Production / deployment
 gunicorn==20.1.0
-eventlet==0.33.3
+gevent==23.9.1
+gevent-websocket==0.10.1
 
 # Local env file support
 python-dotenv==1.0.0
