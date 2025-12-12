@@ -1,0 +1,1739 @@
+{% extends "base.html" %}
+
+{% block title %}Live Display - {{ tournament.name }}{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #14141f;
+        background-image: 
+            linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+        overflow: hidden;
+    }
+    
+    /* Timer Progress Overlay - Simple right-to-left sweep */
+    .timer-overlay {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 0%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0;
+        transition: opacity 0.5s ease, width 1s linear;
+        background: rgba(105, 219, 124, 0.08);
+    }
+    .timer-overlay.active {
+        opacity: 1;
+    }
+    .timer-overlay.timer-warning {
+        background: rgba(255, 212, 59, 0.1);
+    }
+    .timer-overlay.timer-danger {
+        background: rgba(255, 107, 107, 0.12);
+    }
+    .timer-overlay.timer-finished {
+        opacity: 0;
+    }
+    
+    /* Glitch Bars - Background layer */
+    .glitch-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+        overflow: hidden;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .glitch-container.active {
+        opacity: 1;
+    }
+    .glitch-container.timer-finished {
+        opacity: 0;
+    }
+    
+    .glitch-bar {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: rgba(105, 219, 124, 0.25);
+        opacity: 0;
+    }
+    
+    .glitch-container.timer-warning .glitch-bar {
+        background: rgba(255, 212, 59, 0.35);
+    }
+    .glitch-container.timer-danger .glitch-bar {
+        background: rgba(255, 107, 107, 0.4);
+    }
+    
+    /* Edge Corruption - Vignette style corruption around edges */
+    .edge-corruption {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+        opacity: 0;
+        transition: opacity 0.5s;
+        box-shadow: inset 0 0 100px 20px rgba(105, 219, 124, 0.15);
+    }
+    .edge-corruption.active {
+        opacity: 1;
+    }
+    .edge-corruption.timer-warning {
+        box-shadow: inset 0 0 120px 30px rgba(255, 212, 59, 0.2);
+    }
+    .edge-corruption.timer-danger {
+        box-shadow: inset 0 0 150px 40px rgba(255, 107, 107, 0.25);
+    }
+    .edge-corruption.timer-finished {
+        opacity: 0;
+    }
+    
+    /* Static Noise/Grain Texture - Top layer */
+    .static-noise {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+        opacity: 0;
+        transition: opacity 0.5s;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        mix-blend-mode: overlay;
+    }
+    .static-noise.active {
+        opacity: 0.03;
+    }
+    .static-noise.timer-warning {
+        opacity: 0.05;
+    }
+    .static-noise.timer-danger {
+        opacity: 0.08;
+        animation: noise-flicker 0.15s steps(2) infinite;
+    }
+    .static-noise.timer-finished {
+        opacity: 0;
+        animation: none;
+    }
+    
+    @keyframes noise-flicker {
+        0%, 100% { opacity: 0.08; }
+        50% { opacity: 0.04; }
+    }
+    
+    .display-container {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem;
+        position: relative;
+    }
+    
+    /* Scoreboard Mode */
+    .scoreboard-view .tournament-title {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .scoreboard-view .tournament-title h1 {
+        font-size: 3rem;
+        text-transform: uppercase;
+        letter-spacing: 5px;
+        color: var(--ru-primary);
+    }
+    
+    /* Playing Next Indicator */
+    .playing-next-indicator {
+        position: fixed;
+        top: 1.5rem;
+        left: 1.5rem;
+        background: rgba(28, 28, 42, 0.9);
+        border: 1px solid #3a3a50;
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+        z-index: 100;
+        display: none;
+    }
+    .playing-next-indicator.visible {
+        display: block;
+    }
+    .playing-next-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #9a9ab0;
+        margin-bottom: 0.25rem;
+    }
+    .playing-next-teams {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .playing-next-team-1 {
+        color: #4dabf7;
+    }
+    .playing-next-vs {
+        color: #6a6a80;
+        margin: 0 0.5rem;
+        font-weight: normal;
+    }
+    .playing-next-team-2 {
+        color: #ff6b6b;
+    }
+    .match-display {
+        background: #1c1c2a;
+        border: 2px solid #3a3a50;
+        border-radius: 12px;
+        padding: 3rem;
+        width: 100%;
+        max-width: 1400px;
+        transition: background-color 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .match-display .row,
+    .match-display .timer-container {
+        position: relative;
+        z-index: 1;
+    }
+    .vs-badge {
+        font-size: 3rem;
+        color: var(--ru-primary);
+        font-weight: bold;
+    }
+    .team-section {
+        text-align: center;
+    }
+    .team-name {
+        font-size: 3.5rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+    .team-players {
+        font-size: 1.5rem;
+        color: #9a9ab0;
+        margin-bottom: 2rem;
+    }
+    .score-display {
+        font-size: 12rem;
+        font-weight: bold;
+        line-height: 1;
+        transition: all 0.3s;
+    }
+    .score-display.score-changed {
+        transform: scale(1.1);
+    }
+    .team-1 .team-name, .team-1 .score-display { color: #4dabf7; }
+    .team-2 .team-name, .team-2 .score-display { color: #ff6b6b; }
+    
+    /* Match Timer */
+    .timer-container {
+        position: relative;
+        margin-top: 2rem;
+        background: #2a2a3a;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .timer-progress {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: linear-gradient(90deg, rgba(105, 219, 124, 0.3) 0%, rgba(105, 219, 124, 0.5) 100%);
+        transition: width 1s linear, background 0.5s;
+        z-index: 1;
+    }
+    .timer-progress.warning {
+        background: linear-gradient(90deg, rgba(255, 212, 59, 0.3) 0%, rgba(255, 212, 59, 0.5) 100%);
+    }
+    .timer-progress.danger {
+        background: linear-gradient(90deg, rgba(255, 107, 107, 0.3) 0%, rgba(255, 107, 107, 0.6) 100%);
+    }
+    .timer-progress.finished {
+        background: linear-gradient(90deg, rgba(220, 53, 69, 0.4) 0%, rgba(220, 53, 69, 0.7) 100%);
+        width: 100% !important;
+    }
+    .timer-display {
+        position: relative;
+        font-size: 5rem;
+        font-weight: bold;
+        color: #69db7c;
+        text-align: center;
+        padding: 0.5rem 2rem;
+        font-family: 'Courier New', monospace;
+        transition: color 0.3s;
+        z-index: 2;
+    }
+    .timer-display.warning {
+        color: #ffd43b;
+    }
+    .timer-display.danger {
+        color: #ff6b6b;
+    }
+    .timer-display.finished {
+        color: #dc3545;
+    }
+    .timer-display.overtime {
+        color: #ff6b00;
+        animation: overtimePulse 1s ease-in-out infinite;
+    }
+    @keyframes overtimePulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(1.05); }
+    }
+    .timer-progress.overtime {
+        background: linear-gradient(90deg, rgba(255, 107, 0, 0.4) 0%, rgba(255, 107, 0, 0.7) 100%);
+        width: 100% !important;
+        animation: overtimeProgressPulse 1s ease-in-out infinite;
+    }
+    @keyframes overtimeProgressPulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+    }
+    
+    /* Red flashing for last 10 seconds */
+    .scoreboard-flash {
+        animation: redFlash var(--flash-speed, 1s) ease-in-out infinite;
+    }
+    @keyframes redFlash {
+        0%, 100% { background-color: #1c1c2a; }
+        50% { background-color: rgba(220, 53, 69, 0.3); }
+    }
+    
+    /* Live Badge */
+    .live-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #dc3545;
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 4px;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    /* Waiting Screen */
+    .waiting-view {
+        text-align: center;
+    }
+    .next-match-preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3rem;
+        background: rgba(28, 28, 42, 0.9);
+        border: 2px solid #3a3a50;
+        border-radius: 12px;
+        padding: 2.5rem 4rem;
+        animation: pulseGlow 2s ease-in-out infinite;
+    }
+    @keyframes pulseGlow {
+        0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 0, 0.2); }
+        50% { box-shadow: 0 0 40px rgba(255, 107, 0, 0.4); }
+    }
+    .next-team {
+        text-align: center;
+        min-width: 300px;
+    }
+    .next-team-name {
+        font-size: 3rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+    .next-team-1 .next-team-name { color: #4dabf7; }
+    .next-team-2 .next-team-name { color: #ff6b6b; }
+    .next-team-players {
+        font-size: 1.3rem;
+        color: #9a9ab0;
+    }
+    .next-vs-badge {
+        font-size: 2.5rem;
+        color: var(--ru-primary);
+        font-weight: bold;
+        padding: 0 1rem;
+    }
+    .waiting-subtext {
+        font-size: 1.8rem;
+        color: #69db7c;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    /* TV Pairing Info (overlay in corner) */
+    .tv-pairing-badge {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(28, 28, 42, 0.95);
+        border: 1px solid var(--ru-border);
+        border-radius: 12px;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        z-index: 1000;
+        font-size: 0.9rem;
+    }
+    .tv-pairing-badge .code {
+        font-family: monospace;
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: var(--ru-primary);
+        letter-spacing: 3px;
+    }
+    .tv-pairing-badge .label {
+        color: #9a9ab0;
+        font-size: 0.8rem;
+    }
+    .tv-pairing-badge .qr-mini {
+        width: 50px;
+        height: 50px;
+        border-radius: 4px;
+    }
+    .tv-pairing-badge .status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #69db7c;
+        font-size: 0.8rem;
+    }
+    .tv-pairing-badge .status.waiting {
+        color: #ffd43b;
+    }
+    .tv-pairing-badge .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.9); }
+    }
+    
+    /* Hide pairing badge when connected */
+    .tv-pairing-badge.connected {
+        opacity: 0;
+        transform: translateX(100%);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+        pointer-events: none;
+    }
+    
+    /* Match Winner Announcement */
+    .match-winner-view {
+        text-align: center;
+    }
+    .match-winner-label {
+        font-size: 2.5rem;
+        color: #9a9ab0;
+        text-transform: uppercase;
+        letter-spacing: 5px;
+        margin-bottom: 1rem;
+    }
+    .match-winner-name {
+        font-size: 6rem;
+        font-weight: bold;
+        color: #ffd700;
+        text-transform: uppercase;
+        text-shadow: 0 0 40px rgba(255, 215, 0, 0.5);
+        margin-bottom: 0.5rem;
+        animation: winnerPulse 1s ease-in-out infinite;
+    }
+    @keyframes winnerPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+    }
+    .match-winner-players {
+        font-size: 1.8rem;
+        color: #e8e8e8;
+        margin-bottom: 3rem;
+    }
+    .up-next-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 2px solid #3a3a50;
+    }
+    .up-next-label {
+        font-size: 1.5rem;
+        color: #69db7c;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        margin-bottom: 1.5rem;
+    }
+    .up-next-teams {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+    }
+    .up-next-team {
+        font-size: 2rem;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .up-next-team-1 { color: #4dabf7; }
+    .up-next-team-2 { color: #ff6b6b; }
+    .up-next-vs {
+        font-size: 1.5rem;
+        color: var(--ru-primary);
+        font-weight: bold;
+    }
+    
+    /* Message Mode */
+    .message-view {
+        text-align: center;
+    }
+    .message-view .message-text {
+        font-size: 4rem;
+        font-weight: bold;
+        color: #f5f5f5;
+        max-width: 80%;
+        line-height: 1.3;
+    }
+    
+    /* Winner Mode */
+    .winner-view {
+        text-align: center;
+    }
+    .winner-view .trophy {
+        font-size: 10rem;
+        color: #ffd700;
+    }
+    .winner-view .winner-name {
+        font-size: 5rem;
+        font-weight: bold;
+        color: #ffd700;
+        margin: 2rem 0;
+    }
+    .winner-view .winner-players {
+        font-size: 2rem;
+        color: #e8e8e8;
+    }
+    .winner-view .confetti {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: hidden;
+    }
+    
+    /* Bracket Mode - full screen iframe */
+    .bracket-view {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .bracket-view iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    
+    /* View transitions */
+    .view {
+        display: none;
+        width: 100%;
+    }
+    .view.active {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    /* Bracket view needs different active styling */
+    .bracket-view.active {
+        display: block;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    /* Countdown Mode */
+    .countdown-view {
+        text-align: center;
+        position: relative;
+    }
+    .countdown-view.active {
+        animation: none;
+    }
+    #countdown-number {
+        font-size: 25rem;
+        font-weight: bold;
+        color: var(--ru-primary);
+        text-shadow: 0 0 60px rgba(255, 107, 0, 0.5);
+        line-height: 1;
+        display: block;
+    }
+    #countdown-number.countdown-number {
+        animation: countdownPulse 0.8s ease-out forwards;
+    }
+    #countdown-number.countdown-go {
+        color: #69db7c;
+        text-shadow: 0 0 60px rgba(105, 219, 124, 0.5);
+        animation: goZoom 0.8s ease-out forwards;
+    }
+    @keyframes countdownPulse {
+        0% { transform: scale(0.3); opacity: 0; }
+        40% { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes goZoom {
+        0% { transform: scale(0.5); opacity: 0; }
+        40% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .countdown-label {
+        font-size: 2.5rem;
+        color: #9a9ab0;
+        margin-top: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 10px;
+    }
+    
+    /* Transition overlay */
+    .transition-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #14141f;
+        z-index: 500;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .transition-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+    
+    /* Scoreboard entrance animation */
+    .scoreboard-entrance {
+        animation: scoreboardSlideIn 0.8s ease-out;
+    }
+    @keyframes scoreboardSlideIn {
+        0% { opacity: 0; transform: scale(0.8) translateY(50px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Score celebration */
+    .celebration-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+    }
+    .score-burst {
+        position: absolute;
+        font-size: 3rem;
+        font-weight: bold;
+        opacity: 0;
+        animation: burstUp 1s ease-out forwards;
+    }
+    @keyframes burstUp {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-100px) scale(1.5); }
+    }
+    .team-flash {
+        animation: flashHighlight 0.5s ease-out;
+    }
+    @keyframes flashHighlight {
+        0% { background-color: rgba(255, 255, 255, 0.3); }
+        100% { background-color: transparent; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="display-container">
+    <!-- TV Pairing Badge (always visible in corner) -->
+    {% if tv_session %}
+    <div class="tv-pairing-badge" id="tv-pairing-badge">
+        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="qr-mini" title="Scan to pair">
+        <div>
+            <div class="label">TV Code</div>
+            <div class="code">{{ tv_session.code }}</div>
+        </div>
+        <div class="status waiting" id="pairing-status">
+            <div class="status-dot"></div>
+            <span>Waiting for controller</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Timer Progress Overlay -->
+    <div class="timer-overlay" id="timer-overlay"></div>
+    
+    <!-- Glitch Bars - Background layer -->
+    <div class="glitch-container" id="glitch-container">
+        <div class="glitch-bar" id="glitch-bar-1"></div>
+        <div class="glitch-bar" id="glitch-bar-2"></div>
+        <div class="glitch-bar" id="glitch-bar-3"></div>
+        <div class="glitch-bar" id="glitch-bar-4"></div>
+        <div class="glitch-bar" id="glitch-bar-5"></div>
+    </div>
+    
+    <!-- Edge Corruption - Vignette effect -->
+    <div class="edge-corruption" id="edge-corruption"></div>
+    
+    <!-- Static Noise/Grain -->
+    <div class="static-noise" id="static-noise"></div>
+    
+    <div class="celebration-container" id="celebration-container"></div>
+    <div class="live-badge" id="live-badge">
+        <i class="bi bi-broadcast me-2"></i>LIVE
+    </div>
+    
+    <!-- Playing Next Indicator (for scoreboard view) -->
+    <div class="playing-next-indicator" id="playing-next-indicator">
+        <div class="playing-next-label"><i class="bi bi-arrow-right-circle me-1"></i>Playing Next</div>
+        <div class="playing-next-teams">
+            <span class="playing-next-team-1" id="playing-next-team1">-</span>
+            <span class="playing-next-vs">vs</span>
+            <span class="playing-next-team-2" id="playing-next-team2">-</span>
+        </div>
+    </div>
+    
+    <!-- Scoreboard View -->
+    <div class="view scoreboard-view" id="view-scoreboard">
+        <div class="tournament-title">
+            <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="80" class="mb-3">
+            <h1>{{ tournament.name }}</h1>
+        </div>
+        <div class="match-display" id="match-display">
+            <div class="row align-items-center">
+                <div class="col-5 team-section team-1">
+                    <div class="team-name" id="team1-name">-</div>
+                    <div class="team-players" id="team1-players">-</div>
+                    <div class="score-display" id="team1-score">0</div>
+                </div>
+                <div class="col-2 text-center">
+                    <div class="vs-badge">VS</div>
+                </div>
+                <div class="col-5 team-section team-2">
+                    <div class="team-name" id="team2-name">-</div>
+                    <div class="team-players" id="team2-players">-</div>
+                    <div class="score-display" id="team2-score">0</div>
+                </div>
+            </div>
+            <!-- Timer with progress bar -->
+            <div class="timer-container">
+                <div class="timer-progress" id="timer-progress"></div>
+                <div class="timer-display" id="match-timer">2:30</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Waiting View -->
+    <div class="view waiting-view" id="view-waiting">
+        <div class="logo mb-4">
+            <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="180">
+        </div>
+        <h1 class="display-3 mb-3" style="color: var(--ru-primary);">{{ tournament.name }}</h1>
+        <h2 class="display-6 text-muted mb-5" id="next-match-label">Next Match</h2>
+        
+        <!-- Next Match Preview -->
+        <div class="next-match-preview" id="next-match-preview">
+            <div class="next-team next-team-1">
+                <div class="next-team-name" id="next-team1-name">-</div>
+                <div class="next-team-players" id="next-team1-players">-</div>
+            </div>
+            <div class="next-vs-badge">VS</div>
+            <div class="next-team next-team-2">
+                <div class="next-team-name" id="next-team2-name">-</div>
+                <div class="next-team-players" id="next-team2-players">-</div>
+            </div>
+        </div>
+        
+        <div class="waiting-subtext mt-5" id="waiting-subtext">
+            <i class="bi bi-hourglass-split me-2"></i>Get Ready!
+        </div>
+    </div>
+    
+    <!-- Match Winner Announcement View -->
+    <div class="view match-winner-view" id="view-match-winner">
+        <div class="logo mb-4">
+            <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="120">
+        </div>
+        <div class="match-winner-label"><i class="bi bi-trophy-fill me-3"></i>Match Winner</div>
+        <div class="match-winner-name" id="match-winner-name">-</div>
+        <div class="match-winner-players" id="match-winner-players">-</div>
+        
+        <div class="up-next-section" id="up-next-section">
+            <div class="up-next-label"><i class="bi bi-arrow-right-circle me-2"></i>Up Next</div>
+            <div class="up-next-teams">
+                <span class="up-next-team up-next-team-1" id="up-next-team1">-</span>
+                <span class="up-next-vs">VS</span>
+                <span class="up-next-team up-next-team-2" id="up-next-team2">-</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Message View -->
+    <div class="view message-view" id="view-message">
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="150" class="mb-4">
+        <div class="message-text" id="message-text">Welcome!</div>
+    </div>
+    
+    <!-- Winner View -->
+    <div class="view winner-view" id="view-winner">
+        <div class="confetti" id="confetti"></div>
+        <i class="bi bi-trophy-fill trophy"></i>
+        <div class="winner-name" id="winner-name">Champion!</div>
+        <div class="winner-players" id="winner-players">-</div>
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="100" class="mt-4">
+    </div>
+    
+    <!-- Bracket View - using new optimized bracket display -->
+    <div class="view bracket-view" id="view-bracket">
+        <iframe id="bracket-iframe" src="{{ url_for('display.display_bracket', tournament_id=tournament.id) }}" 
+                style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
+    
+    <!-- Countdown View -->
+    <div class="view countdown-view" id="view-countdown">
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="120" class="mb-4">
+        <div id="countdown-number">3</div>
+        <div class="countdown-label">Get Ready</div>
+    </div>
+    
+    <!-- Transition overlay -->
+    <div class="transition-overlay" id="transition-overlay"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const tournamentId = {{ tournament.id }};
+    const tvCode = '{{ tv_session.code if tv_session else "" }}';
+    const socket = io();
+    let currentMatchId = null;
+    let isControllerConnected = false;
+    
+    // Timer variables
+    let timerDuration = {{ tournament.timer_duration }};
+    let timerRemaining = timerDuration;
+    let timerInterval = null;
+    let isOvertime = false;
+    
+    // Request fullscreen
+    function goFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log('Fullscreen failed:', err));
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+    }
+    
+    // Auto-fullscreen on page load if we came from pairing
+    if (document.referrer.includes('/display')) {
+        setTimeout(goFullscreen, 500);
+    }
+    
+    // Connect to socket
+    socket.on('connect', function() {
+        socket.emit('join_tournament', { tournament_id: tournamentId });
+        
+        // Join TV-specific room for targeted control
+        if (tvCode) {
+            socket.emit('join_tv', { code: tvCode });
+            // Send initial heartbeat
+            sendHeartbeat();
+        }
+        
+        console.log('TV Display connected, code:', tvCode);
+    });
+    
+    // Heartbeat to keep TV session alive
+    function sendHeartbeat() {
+        if (tvCode) {
+            fetch('/api/tv/' + tvCode + '/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }).catch(err => console.log('Heartbeat failed:', err));
+        }
+    }
+    
+    // Send heartbeat every 30 seconds
+    setInterval(sendHeartbeat, 30000);
+    
+    // Listen for fullscreen command
+    socket.on('fullscreen', function(data) {
+        if (!data.code || data.code === tvCode) {
+            goFullscreen();
+        }
+    });
+    
+    // Listen for controller connected event
+    socket.on('controller_connected', function(data) {
+        console.log('Controller connected:', data);
+        if (data.code === tvCode) {
+            updatePairingStatus(true);
+            goFullscreen();
+        }
+    });
+    
+    // Listen for controller disconnected event
+    socket.on('controller_disconnected', function(data) {
+        console.log('Controller disconnected:', data);
+        if (data.code === tvCode) {
+            updatePairingStatus(false);
+        }
+    });
+    
+    // Listen for TV control commands
+    socket.on('tv_control', function(data) {
+        console.log('TV control received:', data);
+        if (data.code === tvCode) {
+            // Update controller connected status
+            updatePairingStatus(true);
+            
+            // Handle the control command
+            if (data.mode) {
+                updateDisplay({ mode: data.mode, custom_message: data.custom_message });
+            }
+        }
+    });
+    
+    // Update pairing badge status
+    function updatePairingStatus(connected) {
+        isControllerConnected = connected;
+        const badgeEl = document.getElementById('tv-pairing-badge');
+        const statusEl = document.getElementById('pairing-status');
+        
+        if (badgeEl) {
+            if (connected) {
+                // Hide the entire badge when connected
+                badgeEl.classList.add('connected');
+            } else {
+                badgeEl.classList.remove('connected');
+            }
+        }
+        
+        if (statusEl) {
+            if (connected) {
+                statusEl.classList.remove('waiting');
+                statusEl.innerHTML = '<div class="status-dot"></div><span>Controller connected</span>';
+            } else {
+                statusEl.classList.add('waiting');
+                statusEl.innerHTML = '<div class="status-dot"></div><span>Waiting for controller</span>';
+            }
+        }
+    }
+    
+    // Load initial state
+    function loadDisplayState() {
+        fetch('/api/display/state')
+            .then(r => r.json())
+            .then(data => {
+                updateDisplay(data);
+                // Apply theme if present
+                if (data.theme_css) {
+                    applyThemeCSS(data.theme_css);
+                }
+            });
+    }
+    
+    // Apply theme CSS to the page
+    function applyThemeCSS(css) {
+        let styleEl = document.getElementById('dynamic-theme');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-theme';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = css;
+    }
+    
+    // Update display based on state
+    function updateDisplay(state) {
+        // Apply theme if present
+        if (state.theme_css) {
+            applyThemeCSS(state.theme_css);
+        }
+        
+        // Hide all views
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        
+        // Show the appropriate view
+        const viewId = 'view-' + state.mode;
+        const view = document.getElementById(viewId);
+        if (view) {
+            view.classList.add('active');
+        }
+        
+        // Update live badge visibility
+        document.getElementById('live-badge').style.display = 
+            (state.mode === 'scoreboard') ? 'block' : 'none';
+        
+        // Update view-specific content
+        if (state.mode === 'message' && state.custom_message) {
+            document.getElementById('message-text').textContent = state.custom_message;
+        }
+        
+        if (state.mode === 'winner' && state.winner_team) {
+            document.getElementById('winner-name').textContent = state.winner_team.name;
+            document.getElementById('winner-players').textContent = 
+                state.winner_team.player1 + ' & ' + state.winner_team.player2;
+            createConfetti();
+        }
+        
+        if (state.mode === 'scoreboard' && state.current_match) {
+            updateMatch(state.current_match);
+            // Show "Playing Next" indicator if there's a next match and it's not finals
+            updatePlayingNext(state.next_match);
+        } else {
+            // Hide Playing Next when not in scoreboard mode
+            document.getElementById('playing-next-indicator').classList.remove('visible');
+        }
+        
+        // Show next match info in waiting mode
+        if (state.mode === 'waiting' && state.next_match) {
+            showWaitingWithNextMatch(state.next_match);
+        }
+    }
+    
+    // Update match display
+    function updateMatch(match) {
+        currentMatchId = match.id;
+        
+        if (match.team1) {
+            document.getElementById('team1-name').textContent = match.team1.name;
+            document.getElementById('team1-name').dataset.teamId = match.team1.id;
+            document.getElementById('team1-players').textContent = 
+                match.team1.player1 + ' & ' + match.team1.player2;
+        }
+        if (match.team2) {
+            document.getElementById('team2-name').textContent = match.team2.name;
+            document.getElementById('team2-name').dataset.teamId = match.team2.id;
+            document.getElementById('team2-players').textContent = 
+                match.team2.player1 + ' & ' + match.team2.player2;
+        }
+        
+        document.getElementById('team1-score').textContent = match.team1_score;
+        document.getElementById('team2-score').textContent = match.team2_score;
+    }
+    
+    // Update "Playing Next" indicator
+    function updatePlayingNext(nextMatch) {
+        const indicator = document.getElementById('playing-next-indicator');
+        
+        // Hide if no next match or if the current match IS the finals
+        if (!nextMatch || !nextMatch.team1 || !nextMatch.team2) {
+            indicator.classList.remove('visible');
+            return;
+        }
+        
+        // Show the indicator with next match teams
+        document.getElementById('playing-next-team1').textContent = nextMatch.team1.name;
+        document.getElementById('playing-next-team2').textContent = nextMatch.team2.name;
+        indicator.classList.add('visible');
+    }
+    
+    // Socket event handlers
+    socket.on('display_update', function(data) {
+        console.log('Display update received:', data);
+        // If data contains mode directly (from targeted TV command)
+        if (data && data.mode) {
+            // For modes that need extra data (scoreboard, winner), fetch from API
+            if (data.mode === 'scoreboard' || data.mode === 'winner' || data.mode === 'waiting') {
+                loadDisplayState();
+            } else {
+                // For simple modes (message, tournament, break), use direct data
+                updateDisplay(data);
+            }
+        } else {
+            // Otherwise fetch from API (legacy behavior)
+            loadDisplayState();
+        }
+    });
+    
+    socket.on('score_update', function(data) {
+        if (data.match_id === currentMatchId) {
+            const score1 = document.getElementById('team1-score');
+            const score2 = document.getElementById('team2-score');
+            const oldScore1 = parseInt(score1.textContent);
+            const oldScore2 = parseInt(score2.textContent);
+            
+            // Check which team scored
+            if (data.team1_score > oldScore1) {
+                score1.classList.add('score-changed');
+                setTimeout(() => score1.classList.remove('score-changed'), 300);
+                celebrateScore('team1');
+            }
+            if (data.team2_score > oldScore2) {
+                score2.classList.add('score-changed');
+                setTimeout(() => score2.classList.remove('score-changed'), 300);
+                celebrateScore('team2');
+            }
+            
+            score1.textContent = data.team1_score;
+            score2.textContent = data.team2_score;
+            
+            // Check for overtime winner - if in overtime and someone scores to take the lead
+            if (isOvertime && data.team1_score !== data.team2_score) {
+                console.log('Overtime winner!');
+                isOvertime = false;
+                // Determine winner and trigger auto-complete
+                const winnerId = data.team1_score > data.team2_score ? 
+                    document.getElementById('team1-name').dataset.teamId : 
+                    document.getElementById('team2-name').dataset.teamId;
+                // Show celebration briefly then complete
+                setTimeout(() => {
+                    checkAndCompleteMatch();
+                }, 2000);
+            }
+        }
+    });
+    
+    socket.on('match_complete', function(data) {
+        console.log('Match complete:', data);
+        
+        // Stop any running timer
+        stopTimer();
+        
+        // Show match winner announcement
+        if (data.winner) {
+            showMatchWinner(data.winner, data.next_match);
+        } else if (data.next_match) {
+            showWaitingWithNextMatch(data.next_match);
+        } else {
+            // No more matches - reload state (might show tournament winner)
+            setTimeout(() => loadDisplayState(), 1000);
+        }
+    });
+    
+    // Show match winner announcement with next teams
+    function showMatchWinner(winner, nextMatch) {
+        // Update winner info
+        document.getElementById('match-winner-name').textContent = winner.name;
+        document.getElementById('match-winner-players').textContent = 
+            winner.player1 + ' & ' + winner.player2;
+        
+        // Update up next section
+        const upNextSection = document.getElementById('up-next-section');
+        if (nextMatch && nextMatch.team1 && nextMatch.team2) {
+            document.getElementById('up-next-team1').textContent = nextMatch.team1.name;
+            document.getElementById('up-next-team2').textContent = nextMatch.team2.name;
+            upNextSection.style.display = 'block';
+        } else {
+            upNextSection.style.display = 'none';
+        }
+        
+        // Show match winner view
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-match-winner').classList.add('active');
+        document.getElementById('live-badge').style.display = 'none';
+        
+        // After 10 seconds, transition to waiting screen
+        setTimeout(() => {
+            if (nextMatch) {
+                showWaitingWithNextMatch(nextMatch);
+            } else {
+                loadDisplayState();
+            }
+        }, 10000);
+    }
+    
+    // Show waiting screen with next match info
+    function showWaitingWithNextMatch(nextMatch) {
+        // Update next match team info
+        if (nextMatch.team1) {
+            document.getElementById('next-team1-name').textContent = nextMatch.team1.name;
+            document.getElementById('next-team1-players').textContent = 
+                nextMatch.team1.player1 + ' & ' + nextMatch.team1.player2;
+        } else {
+            document.getElementById('next-team1-name').textContent = 'TBD';
+            document.getElementById('next-team1-players').textContent = '-';
+        }
+        
+        if (nextMatch.team2) {
+            document.getElementById('next-team2-name').textContent = nextMatch.team2.name;
+            document.getElementById('next-team2-players').textContent = 
+                nextMatch.team2.player1 + ' & ' + nextMatch.team2.player2;
+        } else {
+            document.getElementById('next-team2-name').textContent = 'TBD';
+            document.getElementById('next-team2-players').textContent = '-';
+        }
+        
+        // Update round label if available
+        if (nextMatch.round) {
+            document.getElementById('next-match-label').textContent = 'Round ' + nextMatch.round + ' - Next Match';
+        }
+        
+        // Hide all views and show waiting
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-waiting').classList.add('active');
+        document.getElementById('live-badge').style.display = 'none';
+    }
+    
+    socket.on('start_countdown', function(data) {
+        console.log('Countdown started!', data);
+        timerDuration = data.timer_duration || {{ tournament.timer_duration }};
+        startCountdown();
+    });
+    
+    socket.on('current_match_changed', function(data) {
+        loadDisplayState();
+    });
+    
+    socket.on('refresh_display', function() {
+        location.reload();
+    });
+    
+    // Listen for theme changes
+    socket.on('theme_change', function(data) {
+        console.log('Theme change received:', data);
+        if (data.theme_css) {
+            applyThemeCSS(data.theme_css);
+        }
+    });
+    
+    // Glitch bar animation
+    let glitchInterval = null;
+    const glitchBars = [];
+    
+    function initGlitchBars() {
+        for (let i = 1; i <= 5; i++) {
+            glitchBars.push(document.getElementById('glitch-bar-' + i));
+        }
+    }
+    
+    function animateGlitchBar(bar, intensity) {
+        // Random position, size, and animation
+        const top = Math.random() * 100;
+        const height = 2 + Math.random() * 6;
+        const width = 20 + Math.random() * 80;
+        const xOffset = Math.random() * (100 - width);
+        const duration = 50 + Math.random() * 150;
+        
+        bar.style.top = top + '%';
+        bar.style.height = height + 'px';
+        bar.style.width = width + '%';
+        bar.style.left = xOffset + '%';
+        bar.style.opacity = (0.3 + Math.random() * 0.5) * intensity;
+        
+        // Quick flash animation
+        setTimeout(() => {
+            bar.style.opacity = 0;
+        }, duration);
+    }
+    
+    function updateGlitch(progressPercent) {
+        const glitchContainer = document.getElementById('glitch-container');
+        const edgeCorruption = document.getElementById('edge-corruption');
+        const staticNoise = document.getElementById('static-noise');
+        
+        // Calculate what percent 10 seconds is of total duration
+        const tenSecondPercent = (10 / timerDuration) * 100;
+        
+        if (progressPercent >= 100 || progressPercent <= 0) {
+            glitchContainer.classList.remove('active');
+            edgeCorruption.classList.remove('active');
+            staticNoise.classList.remove('active');
+            return;
+        }
+        
+        // Edge corruption and static noise activate at 30% (warning phase)
+        if (progressPercent <= 30) {
+            edgeCorruption.classList.add('active');
+            staticNoise.classList.add('active');
+        } else {
+            edgeCorruption.classList.remove('active');
+            staticNoise.classList.remove('active');
+        }
+        
+        // Glitch bars only activate in the last 10 seconds
+        if (progressPercent <= tenSecondPercent) {
+            glitchContainer.classList.add('active');
+        } else {
+            glitchContainer.classList.remove('active');
+        }
+        
+        // Remove state classes
+        glitchContainer.classList.remove('timer-warning', 'timer-danger', 'timer-finished');
+        edgeCorruption.classList.remove('timer-warning', 'timer-danger', 'timer-finished');
+        staticNoise.classList.remove('timer-warning', 'timer-danger', 'timer-finished');
+        
+        // Intensity increases as time runs out (0 to 1)
+        const intensity = 1 - (progressPercent / 100);
+        
+        // Set color state for all layers
+        if (progressPercent <= tenSecondPercent) {
+            glitchContainer.classList.add('timer-danger');
+            edgeCorruption.classList.add('timer-danger');
+            staticNoise.classList.add('timer-danger');
+            
+            // Glitch bars only animate in the last 10 seconds
+            glitchBars.forEach(bar => {
+                if (Math.random() < intensity * 0.5) {
+                    animateGlitchBar(bar, intensity);
+                }
+            });
+        } else if (progressPercent <= 30) {
+            glitchContainer.classList.add('timer-warning');
+            edgeCorruption.classList.add('timer-warning');
+            staticNoise.classList.add('timer-warning');
+        }
+    }
+    
+    // Format seconds to MM:SS
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return mins + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+    
+    // Update timer display with warning colors and flashing
+    function updateTimerDisplay() {
+        const timerEl = document.getElementById('match-timer');
+        const timerProgress = document.getElementById('timer-progress');
+        const matchDisplay = document.getElementById('match-display');
+        const timerOverlay = document.getElementById('timer-overlay');
+        const glitchContainer = document.getElementById('glitch-container');
+        const edgeCorruption = document.getElementById('edge-corruption');
+        const staticNoise = document.getElementById('static-noise');
+        
+        timerEl.textContent = formatTime(timerRemaining);
+        
+        // Update progress bar width (percentage of time remaining)
+        const progressPercent = (timerRemaining / timerDuration) * 100;
+        timerProgress.style.width = progressPercent + '%';
+        
+        // Update background timer progress (right to left)
+        matchDisplay.style.setProperty('--timer-progress', progressPercent + '%');
+        
+        // Update timer overlay - grows from right as time runs out
+        timerOverlay.style.width = (100 - progressPercent) + '%';
+        timerOverlay.classList.add('active');
+        
+        // Update glitch effect (handles all corruption layers)
+        updateGlitch(progressPercent);
+        
+        // Remove all state classes
+        timerEl.classList.remove('warning', 'danger', 'finished');
+        timerProgress.classList.remove('warning', 'danger', 'finished');
+        matchDisplay.classList.remove('scoreboard-flash', 'timer-warning', 'timer-danger', 'timer-finished');
+        timerOverlay.classList.remove('timer-warning', 'timer-danger', 'timer-finished');
+        
+        if (timerRemaining <= 0) {
+            timerEl.classList.add('finished');
+            timerProgress.classList.add('finished');
+            matchDisplay.classList.add('timer-finished');
+            timerOverlay.classList.add('timer-finished');
+            glitchContainer.classList.add('timer-finished');
+            edgeCorruption.classList.add('timer-finished');
+            staticNoise.classList.add('timer-finished');
+            timerEl.textContent = "TIME!";
+            // No flashing when time is up - just solid state
+        } else if (timerRemaining <= 10) {
+            timerEl.classList.add('danger');
+            timerProgress.classList.add('danger');
+            matchDisplay.classList.add('timer-danger');
+            matchDisplay.classList.add('scoreboard-flash');
+            timerOverlay.classList.add('timer-danger');
+            // Speed up flashing as time runs out
+            const flashSpeed = 0.2 + (timerRemaining / 10) * 0.8;
+            matchDisplay.style.setProperty('--flash-speed', flashSpeed + 's');
+        } else if (timerRemaining <= 30) {
+            timerEl.classList.add('warning');
+            timerProgress.classList.add('warning');
+            matchDisplay.classList.add('timer-warning');
+            timerOverlay.classList.add('timer-warning');
+        }
+    }
+    
+    // Start the match timer
+    function startTimer() {
+        // Initialize glitch bars if needed
+        if (glitchBars.length === 0) {
+            initGlitchBars();
+        }
+        
+        timerRemaining = timerDuration;
+        updateTimerDisplay();
+        
+        if (timerInterval) clearInterval(timerInterval);
+        if (glitchInterval) clearInterval(glitchInterval);
+        
+        timerInterval = setInterval(() => {
+            timerRemaining--;
+            updateTimerDisplay();
+            
+            if (timerRemaining <= 0) {
+                clearInterval(timerInterval);
+                clearInterval(glitchInterval);
+                timerInterval = null;
+                glitchInterval = null;
+                
+                // Check scores to determine winner or overtime
+                checkTimeEnd();
+            }
+        }, 1000);
+        
+        // Glitch animation runs more frequently for smoother effect
+        glitchInterval = setInterval(() => {
+            const progressPercent = (timerRemaining / timerDuration) * 100;
+            updateGlitch(progressPercent);
+        }, 100);
+    }
+    
+    // Check what happens when time ends
+    function checkTimeEnd() {
+        const score1 = parseInt(document.getElementById('team1-score').textContent);
+        const score2 = parseInt(document.getElementById('team2-score').textContent);
+        
+        if (score1 === score2) {
+            // Tie game - go to overtime
+            startOvertime();
+        } else {
+            // Someone won - auto complete the match
+            checkAndCompleteMatch();
+        }
+    }
+    
+    // Start overtime mode
+    function startOvertime() {
+        isOvertime = true;
+        const timerEl = document.getElementById('match-timer');
+        const timerProgress = document.getElementById('timer-progress');
+        const matchDisplay = document.getElementById('match-display');
+        const timerOverlay = document.getElementById('timer-overlay');
+        const glitchContainer = document.getElementById('glitch-container');
+        const edgeCorruption = document.getElementById('edge-corruption');
+        const staticNoise = document.getElementById('static-noise');
+        
+        // Stop glitch animation
+        if (glitchInterval) {
+            clearInterval(glitchInterval);
+            glitchInterval = null;
+        }
+        
+        // Update display to show overtime
+        timerEl.textContent = 'OVERTIME';
+        timerEl.classList.remove('warning', 'danger', 'finished');
+        timerEl.classList.add('overtime');
+        timerProgress.classList.remove('warning', 'danger', 'finished');
+        timerProgress.classList.add('overtime');
+        
+        // Hide all corruption effects during overtime
+        timerOverlay.classList.remove('active', 'timer-warning', 'timer-danger');
+        timerOverlay.classList.add('timer-finished');
+        glitchContainer.classList.remove('active', 'timer-warning', 'timer-danger');
+        glitchContainer.classList.add('timer-finished');
+        edgeCorruption.classList.remove('active', 'timer-warning', 'timer-danger');
+        edgeCorruption.classList.add('timer-finished');
+        staticNoise.classList.remove('active', 'timer-warning', 'timer-danger');
+        staticNoise.classList.add('timer-finished');
+        
+        // Keep the match display flashing orange
+        matchDisplay.classList.add('scoreboard-flash');
+        matchDisplay.style.setProperty('--flash-speed', '1s');
+    }
+    
+    // Check and complete the match (called when there's a winner)
+    function checkAndCompleteMatch() {
+        const score1 = parseInt(document.getElementById('team1-score').textContent);
+        const score2 = parseInt(document.getElementById('team2-score').textContent);
+        
+        if (score1 === score2) {
+            // Still tied, don't complete
+            return;
+        }
+        
+        // Emit pending winner event - iPad must confirm
+        const winnerId = score1 > score2 ? 
+            document.getElementById('team1-name').dataset.teamId :
+            document.getElementById('team2-name').dataset.teamId;
+        const winnerName = score1 > score2 ?
+            document.getElementById('team1-name').textContent :
+            document.getElementById('team2-name').textContent;
+            
+        socket.emit('winner_pending', {
+            match_id: currentMatchId,
+            team1_score: score1,
+            team2_score: score2,
+            winner_id: parseInt(winnerId),
+            winner_name: winnerName,
+            is_overtime: isOvertime
+        });
+    }
+    
+    // Stop the timer and hide all timer-related effects
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        if (glitchInterval) {
+            clearInterval(glitchInterval);
+            glitchInterval = null;
+        }
+        isOvertime = false;
+        
+        const matchDisplay = document.getElementById('match-display');
+        const timerEl = document.getElementById('match-timer');
+        const timerProgress = document.getElementById('timer-progress');
+        const timerOverlay = document.getElementById('timer-overlay');
+        const glitchContainer = document.getElementById('glitch-container');
+        const edgeCorruption = document.getElementById('edge-corruption');
+        const staticNoise = document.getElementById('static-noise');
+        
+        // Remove all timer state classes from display
+        matchDisplay.classList.remove('scoreboard-flash', 'timer-warning', 'timer-danger', 'timer-finished');
+        timerEl.classList.remove('overtime', 'warning', 'danger', 'finished');
+        timerProgress.classList.remove('overtime', 'warning', 'danger', 'finished');
+        
+        // Hide timer overlay
+        if (timerOverlay) {
+            timerOverlay.classList.remove('active', 'timer-warning', 'timer-danger', 'timer-finished');
+            timerOverlay.style.width = '0%';
+        }
+        
+        // Hide all glitch effects
+        if (glitchContainer) {
+            glitchContainer.classList.remove('active', 'timer-warning', 'timer-danger', 'timer-finished');
+        }
+        if (edgeCorruption) {
+            edgeCorruption.classList.remove('active', 'timer-warning', 'timer-danger', 'timer-finished');
+        }
+        if (staticNoise) {
+            staticNoise.classList.remove('active', 'timer-warning', 'timer-danger', 'timer-finished');
+        }
+        
+        // Reset glitch bars
+        glitchBars.forEach(bar => {
+            if (bar) {
+                bar.style.opacity = '0';
+            }
+        });
+    }
+    
+    // Countdown animation
+    function startCountdown() {
+        const countdownView = document.getElementById('view-countdown');
+        const countdownNumber = document.getElementById('countdown-number');
+        
+        // Hide all views and show countdown
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('live-badge').style.display = 'none';
+        countdownView.classList.add('active');
+        
+        let count = 3;
+        
+        // Show initial number
+        countdownNumber.textContent = count;
+        countdownNumber.className = '';
+        void countdownNumber.offsetWidth; // Force reflow
+        countdownNumber.className = 'countdown-number';
+        
+        const countInterval = setInterval(() => {
+            count--;
+            
+            if (count > 0) {
+                // Show next number with fresh animation
+                countdownNumber.textContent = count;
+                countdownNumber.className = '';
+                void countdownNumber.offsetWidth; // Force reflow
+                countdownNumber.className = 'countdown-number';
+            } else if (count === 0) {
+                // Show GO!
+                countdownNumber.textContent = 'GO!';
+                countdownNumber.className = '';
+                void countdownNumber.offsetWidth; // Force reflow
+                countdownNumber.className = 'countdown-go';
+            } else {
+                // Transition to scoreboard
+                clearInterval(countInterval);
+                transitionToScoreboard();
+            }
+        }, 1000);
+    }
+    
+    // Smooth transition from countdown to scoreboard
+    function transitionToScoreboard() {
+        const overlay = document.getElementById('transition-overlay');
+        const scoreboardView = document.getElementById('view-scoreboard');
+        const matchDisplay = document.getElementById('match-display');
+        
+        // Flash overlay
+        overlay.classList.add('active');
+        
+        setTimeout(() => {
+            // Switch to scoreboard
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            scoreboardView.classList.add('active');
+            document.getElementById('live-badge').style.display = 'block';
+            
+            // Add entrance animation
+            matchDisplay.classList.add('scoreboard-entrance');
+            
+            // Fade out overlay
+            overlay.classList.remove('active');
+            
+            // Start the match timer
+            startTimer();
+            
+            // Clean up
+            setTimeout(() => {
+                matchDisplay.classList.remove('scoreboard-entrance');
+            }, 800);
+            
+            // Update server state to scoreboard
+            fetch('/api/display/mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'scoreboard' })
+            });
+        }, 300);
+    }
+    
+    // Mini celebration when a team scores
+    function celebrateScore(team) {
+        const container = document.getElementById('celebration-container');
+        const teamSection = document.querySelector(`.${team === 'team1' ? 'team-1' : 'team-2'}`);
+        const color = team === 'team1' ? '#4dabf7' : '#ff6b6b';
+        
+        // Flash the team section
+        if (teamSection) {
+            teamSection.classList.add('team-flash');
+            setTimeout(() => teamSection.classList.remove('team-flash'), 500);
+        }
+        
+        // Create burst particles
+        const rect = teamSection ? teamSection.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 100, height: 100 };
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Add "+1" text
+        const goalText = document.createElement('div');
+        goalText.className = 'score-burst';
+        goalText.textContent = '+1';
+        goalText.style.color = color;
+        goalText.style.left = `${centerX - 30}px`;
+        goalText.style.top = `${centerY}px`;
+        container.appendChild(goalText);
+        
+        // Create small burst particles
+        for (let i = 0; i < 12; i++) {
+            const particle = document.createElement('div');
+            const angle = (i / 12) * Math.PI * 2;
+            const distance = 80 + Math.random() * 40;
+            
+            particle.style.cssText = `
+                position: absolute;
+                width: 8px;
+                height: 8px;
+                background: ${color};
+                border-radius: 50%;
+                left: ${centerX}px;
+                top: ${centerY}px;
+                opacity: 1;
+                animation: particleBurst 0.6s ease-out forwards;
+                --tx: ${Math.cos(angle) * distance}px;
+                --ty: ${Math.sin(angle) * distance}px;
+            `;
+            container.appendChild(particle);
+        }
+        
+        // Add particle animation if not exists
+        if (!document.getElementById('particle-style')) {
+            const style = document.createElement('style');
+            style.id = 'particle-style';
+            style.textContent = `
+                @keyframes particleBurst {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Clean up after animation
+        setTimeout(() => {
+            container.innerHTML = '';
+        }, 1000);
+    }
+    
+    // Confetti effect for winner
+    function createConfetti() {
+        const container = document.getElementById('confetti');
+        container.innerHTML = '';
+        const colors = ['#ff6b00', '#ffd700', '#ff6b6b', '#4dabf7', '#69db7c'];
+        
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.style.cssText = `
+                position: absolute;
+                width: 10px;
+                height: 10px;
+                background: ${colors[Math.floor(Math.random() * colors.length)]};
+                left: ${Math.random() * 100}%;
+                top: -20px;
+                animation: fall ${2 + Math.random() * 3}s linear infinite;
+                animation-delay: ${Math.random() * 2}s;
+            `;
+            container.appendChild(confetti);
+        }
+        
+        // Add CSS animation
+        if (!document.getElementById('confetti-style')) {
+            const style = document.createElement('style');
+            style.id = 'confetti-style';
+            style.textContent = `
+                @keyframes fall {
+                    to {
+                        transform: translateY(100vh) rotate(720deg);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    // Load initial state on page load
+    loadDisplayState();
+</script>
+{% endblock %}

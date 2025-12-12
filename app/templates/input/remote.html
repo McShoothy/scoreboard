@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}TV Remote - {{ tournament.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mode-btn {
+        min-height: 120px;
+        font-size: 1.3rem;
+        transition: all 0.3s;
+    }
+    .mode-btn.active {
+        background-color: var(--ru-primary) !important;
+        border-color: var(--ru-primary) !important;
+        transform: scale(1.05);
+    }
+    .mode-btn i {
+        font-size: 2.5rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    .quick-action {
+        min-height: 80px;
+        font-size: 1.1rem;
+    }
+    .preview-box {
+        background: var(--ru-dark);
+        border: 2px solid var(--ru-primary);
+        border-radius: 10px;
+        padding: 1rem;
+        min-height: 150px;
+    }
+    /* Winner Confirmation Modal */
+    .confirm-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+    .confirm-overlay.active {
+        display: flex;
+    }
+    .confirm-panel {
+        background: #1c1c2a;
+        border: 3px solid var(--ru-primary);
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+    }
+    .confirm-title {
+        font-size: 1.5rem;
+        color: #ffd700;
+        margin-bottom: 1rem;
+    }
+    .confirm-winner-name {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #69db7c;
+        margin-bottom: 0.5rem;
+    }
+    .confirm-score {
+        font-size: 1.8rem;
+        color: #e8e8e8;
+        margin-bottom: 2rem;
+    }
+    .overtime-badge {
+        display: inline-block;
+        background: #ff6b00;
+        color: white;
+        padding: 0.3rem 1rem;
+        border-radius: 20px;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-tv me-2"></i>TV Remote</h1>
+    <a href="{{ url_for('input.input_tournament', tournament_id=tournament.id) }}" class="btn btn-outline-light">
+        <i class="bi bi-arrow-left me-1"></i>Back to Scores
+    </a>
+</div>
+
+<!-- Current Status -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-display me-2"></i>Current Display: <span id="current-mode" class="text-warning">Loading...</span></h5>
+    </div>
+</div>
+
+<!-- Display Modes -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Display Mode</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <button class="btn btn-outline-light mode-btn w-100" data-mode="scoreboard" onclick="setMode('scoreboard')">
+                    <i class="bi bi-trophy"></i>
+                    Live Score
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button class="btn btn-outline-light mode-btn w-100" data-mode="bracket" onclick="setMode('bracket')">
+                    <i class="bi bi-diagram-3"></i>
+                    Bracket
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button class="btn btn-outline-light mode-btn w-100" data-mode="winner" onclick="setMode('winner')">
+                    <i class="bi bi-award"></i>
+                    Winner
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button class="btn btn-outline-light mode-btn w-100" data-mode="message" onclick="setMode('message')">
+                    <i class="bi bi-chat-square-text"></i>
+                    Message
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Message Panel (shown when message mode) -->
+<div class="card mb-4" id="message-panel" style="display: none;">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-chat-square-text me-2"></i>Custom Message</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <textarea class="form-control" id="custom-message" rows="3" placeholder="Enter message to display on TV..."></textarea>
+        </div>
+        <button class="btn btn-ru w-100" onclick="sendMessage()">
+            <i class="bi bi-send me-2"></i>Send to TV
+        </button>
+        <div class="mt-3">
+            <p class="text-muted mb-2">Quick Messages:</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-warning" onclick="quickMessage('🎮 Next match starting soon!')">Next Match Soon</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="quickMessage('⏸️ Break Time - Back in 5 minutes')">Break Time</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="quickMessage('🏆 Finals coming up!')">Finals Soon</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="quickMessage('👋 Thanks for watching!')">Thanks</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Winner Panel (shown when winner mode) -->
+<div class="card mb-4" id="winner-panel" style="display: none;">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-award me-2"></i>Select Winner</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for team in teams %}
+            <div class="col-6 col-md-4">
+                <button class="btn btn-outline-success w-100 py-3" onclick="setWinner({{ team.id }})">
+                    <strong>{{ team.name }}</strong>
+                    <br><small>{{ team.player1 }} & {{ team.player2 }}</small>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Timer Settings -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-stopwatch me-2"></i>Match Timer</h5>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center g-3">
+            <div class="col-md-6">
+                <label class="form-label">Timer Duration</label>
+                <div class="input-group">
+                    <input type="number" id="timer-minutes" class="form-control form-control-lg text-center" value="{{ (tournament.timer_duration // 60) }}" min="0" max="59" style="max-width: 80px;">
+                    <span class="input-group-text">:</span>
+                    <input type="number" id="timer-seconds" class="form-control form-control-lg text-center" value="{{ '%02d' % (tournament.timer_duration % 60) }}" min="0" max="59" style="max-width: 80px;">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-warning w-100" onclick="updateTimer()">
+                    <i class="bi bi-save me-2"></i>Update Timer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Quick Actions</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12 mb-2">
+                <button class="btn btn-success quick-action w-100" style="min-height: 100px; font-size: 1.5rem;" onclick="startCountdown()">
+                    <i class="bi bi-play-circle me-2" style="font-size: 2rem;"></i>Start Match (3-2-1 Countdown + Timer)
+                </button>
+            </div>
+            <div class="col-6">
+                <button class="btn btn-outline-info quick-action w-100" onclick="setMode('waiting')">
+                    <i class="bi bi-hourglass-split me-2"></i>Show Waiting Screen
+                </button>
+            </div>
+            <div class="col-6">
+                <button class="btn btn-outline-success quick-action w-100" onclick="refreshTV()">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh TV Display
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Open TV Display -->
+<div class="text-center">
+    <a href="{{ url_for('display.display_live', tournament_id=tournament.id) }}" target="_blank" class="btn btn-lg btn-ru">
+        <i class="bi bi-box-arrow-up-right me-2"></i>Open TV Display in New Tab
+    </a>
+</div>
+
+<!-- Winner Confirmation Overlay -->
+<div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-panel">
+        <div class="overtime-badge" id="overtime-badge" style="display: none;">
+            <i class="bi bi-lightning-fill me-1"></i>OVERTIME
+        </div>
+        <div class="confirm-title">
+            <i class="bi bi-trophy-fill me-2"></i>Confirm Winner?
+        </div>
+        <div class="confirm-winner-name" id="confirm-winner-name">-</div>
+        <div class="confirm-score">
+            <span id="confirm-team1-score">0</span> - <span id="confirm-team2-score">0</span>
+        </div>
+        
+        <div class="d-grid gap-3">
+            <button class="btn btn-success btn-lg" onclick="confirmWinner()">
+                <i class="bi bi-check-circle me-2"></i>Confirm Winner
+            </button>
+            <button class="btn btn-warning btn-lg" onclick="goBackToMatch()">
+                <i class="bi bi-arrow-left me-2"></i>Go Back & Adjust Scores
+            </button>
+            <button class="btn btn-outline-secondary" onclick="cancelConfirmation()">
+                <i class="bi bi-x-circle me-2"></i>Cancel
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const tournamentId = {{ tournament.id }};
+    const socket = io();
+    let currentMode = 'scoreboard';
+    let pendingWinner = null;
+    
+    // Socket connection
+    socket.on('connect', function() {
+        socket.emit('join_tournament', { tournament_id: tournamentId });
+    });
+    
+    // Listen for winner pending event
+    socket.on('winner_pending', function(data) {
+        console.log('Winner pending:', data);
+        pendingWinner = data;
+        showWinnerConfirmation(data);
+    });
+    
+    function showWinnerConfirmation(data) {
+        document.getElementById('confirm-winner-name').textContent = data.winner_name;
+        document.getElementById('confirm-team1-score').textContent = data.team1_score;
+        document.getElementById('confirm-team2-score').textContent = data.team2_score;
+        document.getElementById('overtime-badge').style.display = data.is_overtime ? 'inline-block' : 'none';
+        document.getElementById('confirm-overlay').classList.add('active');
+        
+        // Play a sound or vibrate to alert
+        if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+        }
+    }
+    
+    function confirmWinner() {
+        if (!pendingWinner) return;
+        
+        // Complete the match with the pending winner
+        fetch('/api/match/' + pendingWinner.match_id + '/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ winner_id: pendingWinner.winner_id })
+        }).then(() => {
+            hideConfirmation();
+            pendingWinner = null;
+        });
+    }
+    
+    function goBackToMatch() {
+        hideConfirmation();
+        // Redirect to the score input page
+        window.location.href = '/input/tournament/' + tournamentId;
+    }
+    
+    function cancelConfirmation() {
+        hideConfirmation();
+        // Tell TV to go back to scoreboard mode (match continues)
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'scoreboard',
+                tournament_id: tournamentId
+            })
+        });
+        pendingWinner = null;
+    }
+    
+    function hideConfirmation() {
+        document.getElementById('confirm-overlay').classList.remove('active');
+    }
+    
+    // Load current state
+    fetch('/api/display/state')
+        .then(r => r.json())
+        .then(data => {
+            currentMode = data.mode;
+            updateModeButtons();
+            document.getElementById('current-mode').textContent = getModeLabel(data.mode);
+            if (data.custom_message) {
+                document.getElementById('custom-message').value = data.custom_message;
+            }
+        });
+    
+    function getModeLabel(mode) {
+        const labels = {
+            'scoreboard': 'Live Scoreboard',
+            'bracket': 'Tournament Bracket',
+            'winner': 'Winner Celebration',
+            'message': 'Custom Message',
+            'waiting': 'Waiting Screen'
+        };
+        return labels[mode] || mode;
+    }
+    
+    function updateModeButtons() {
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.mode === currentMode) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Show/hide panels
+        document.getElementById('message-panel').style.display = currentMode === 'message' ? 'block' : 'none';
+        document.getElementById('winner-panel').style.display = currentMode === 'winner' ? 'block' : 'none';
+    }
+    
+    function setMode(mode) {
+        currentMode = mode;
+        updateModeButtons();
+        document.getElementById('current-mode').textContent = getModeLabel(mode);
+        
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: mode,
+                tournament_id: tournamentId
+            })
+        });
+    }
+    
+    function sendMessage() {
+        const message = document.getElementById('custom-message').value;
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'message',
+                tournament_id: tournamentId,
+                custom_message: message
+            })
+        });
+        document.getElementById('current-mode').textContent = 'Custom Message';
+    }
+    
+    function quickMessage(message) {
+        document.getElementById('custom-message').value = message;
+        setMode('message');
+        sendMessage();
+    }
+    
+    function setWinner(teamId) {
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'winner',
+                tournament_id: tournamentId,
+                winner_team_id: teamId
+            })
+        });
+        document.getElementById('current-mode').textContent = 'Winner Celebration';
+    }
+    
+    function refreshTV() {
+        socket.emit('refresh_display');
+        alert('TV refresh signal sent!');
+    }
+    
+    function startCountdown() {
+        const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
+        const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+        const timerDuration = minutes * 60 + seconds;
+        
+        // Set mode to countdown and broadcast with timer
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'countdown',
+                tournament_id: tournamentId
+            })
+        }).then(() => {
+            socket.emit('start_countdown', { 
+                tournament_id: tournamentId,
+                timer_duration: timerDuration
+            });
+            document.getElementById('current-mode').textContent = 'Countdown → Live Score';
+        });
+    }
+    
+    function updateTimer() {
+        const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
+        const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+        const timerDuration = minutes * 60 + seconds;
+        
+        fetch('/api/tournament/' + tournamentId + '/timer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timer_duration: timerDuration })
+        }).then(() => {
+            alert('Timer updated to ' + minutes + ':' + (seconds < 10 ? '0' : '') + seconds);
+        });
+    }
+</script>
+{% endblock %}

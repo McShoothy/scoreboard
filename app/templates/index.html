@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}RobotUprising 2v2 Tournament{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <div class="mb-4">
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="150">
+    </div>
+    <h1 class="display-3 mb-4">
+        
+    </h1>
+    <h2 class="display-5 mb-5">2v2 Tournament Scoreboard</h2>
+    
+    <div class="row justify-content-center g-4">
+        <div class="col-md-4">
+            <a href="/admin" class="text-decoration-none">
+                <div class="card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="bi bi-gear display-1 text-warning mb-3"></i>
+                        <h3>Admin Panel</h3>
+                        <p class="text-muted">Manage teams and tournaments</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="/input" class="text-decoration-none">
+                <div class="card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="bi bi-tablet display-1 text-warning mb-3"></i>
+                        <h3>iPad Input</h3>
+                        <p class="text-muted">Enter match scores</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="/display" class="text-decoration-none">
+                <div class="card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="bi bi-tv display-1 text-warning mb-3"></i>
+                        <h3>TV Display</h3>
+                        <p class="text-muted">View live scoreboard</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

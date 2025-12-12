@@ -1,0 +1,15 @@
+Flask==3.0.0
+Flask-SocketIO==5.3.6
+Flask-SQLAlchemy==3.1.1
+python-socketio==5.10.0
+python-engineio==4.8.1
+Werkzeug==3.0.1
+simple-websocket
+qrcode[pil]==7.4.2
+
+# Production / deployment
+gunicorn==20.1.0
+eventlet==0.33.3
+
+# Local env file support
+python-dotenv==1.0.0

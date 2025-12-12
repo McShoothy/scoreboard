@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tournament.name }} - RobotUprising{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-trophy me-2"></i>{{ tournament.name }}</h1>
+        <span class="badge bg-info fs-6">
+            {% if tournament.format == 'single_elimination' %}🏆 Single Elimination
+            {% elif tournament.format == 'double_elimination' %}🏆🏆 Double Elimination
+            {% elif tournament.format == 'round_robin' %}🔄 Round Robin
+            {% elif tournament.format == 'round_robin_playoffs' %}🔄➡️🏆 Round Robin + Playoffs
+            {% elif tournament.format == 'swiss' %}🎯 Swiss System
+            {% endif %}
+        </span>
+        {% if tournament.format == 'round_robin_playoffs' %}
+        <span class="badge bg-warning text-dark fs-6 ms-2">
+            Phase: {{ tournament.current_phase|capitalize }}
+        </span>
+        {% endif %}
+    </div>
+    <a href="{{ url_for('admin.manage_tournaments') }}" class="btn btn-outline-light">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+{% if standings %}
+<!-- Standings Table for Round Robin formats -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Standings</h5>
+                {% if tournament.format == 'round_robin_playoffs' and tournament.current_phase == 'group' %}
+                <form method="POST" action="{{ url_for('admin.advance_to_playoffs', tournament_id=tournament.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Advance top 4 teams to playoffs?')">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Advance Top 4 to Playoffs
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-striped">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Team</th>
+                                <th class="text-center">W</th>
+                                <th class="text-center">L</th>
+                                <th class="text-center">PF</th>
+                                <th class="text-center">PA</th>
+                                <th class="text-center">+/-</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in standings %}
+                            <tr class="{% if entry.rank <= 4 and tournament.format == 'round_robin_playoffs' %}table-success{% endif %}">
+                                <td><strong>{{ entry.rank }}</strong></td>
+                                <td>
+                                    {{ entry.team.name }}
+                                    {% if entry.rank <= 4 and tournament.format == 'round_robin_playoffs' %}
+                                    <span class="badge bg-success ms-1">Playoff</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ entry.wins }}</td>
+                                <td class="text-center">{{ entry.losses }}</td>
+                                <td class="text-center">{{ entry.points_for }}</td>
+                                <td class="text-center">{{ entry.points_against }}</td>
+                                <td class="text-center {% if entry.point_diff > 0 %}text-success{% elif entry.point_diff < 0 %}text-danger{% endif %}">
+                                    {% if entry.point_diff > 0 %}+{% endif %}{{ entry.point_diff }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if tournament.format in ['round_robin', 'round_robin_playoffs', 'swiss'] %}
+                    Matches
+                    {% else %}
+                    Tournament Bracket
+                    {% endif %}
+                </h5>
+                <div>
+                    <a href="{{ url_for('display.display_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-outline-light" target="_blank">
+                        <i class="bi bi-tv me-1"></i>TV Display
+                    </a>
+                    <a href="{{ url_for('input.input_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-ru" target="_blank">
+                        <i class="bi bi-tablet me-1"></i>iPad Input
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% set rounds = matches|map(attribute='round_number')|list|unique|list %}
+                <div class="bracket-container" style="overflow-x: auto;">
+                    <div class="d-flex gap-4">
+                        {% for round_num in rounds|sort %}
+                        <div class="round-column" style="min-width: 250px;">
+                            <h6 class="text-center text-warning mb-3">
+                                {% if round_num >= 200 %}
+                                    Grand Finals
+                                {% elif round_num >= 101 %}
+                                    Finals
+                                {% elif round_num == 100 %}
+                                    Semifinals
+                                {% elif tournament.format in ['round_robin', 'round_robin_playoffs'] and round_num < 100 %}
+                                    Round {{ round_num }}
+                                {% elif tournament.format == 'swiss' %}
+                                    Swiss Round {{ round_num }}
+                                {% elif loop.last %}
+                                    Finals
+                                {% elif loop.index == loop.length - 1 %}
+                                    Semi-Finals
+                                {% else %}
+                                    Round {{ round_num }}
+                                {% endif %}
+                            </h6>
+                            {% for match in matches if match.round_number == round_num %}
+                            <div class="match-card card mb-3 {% if match.is_current %}border-warning{% endif %}">
+                                <div class="card-body p-2">
+                                    <small class="text-muted">
+                                        {% if match.group_name %}{{ match.group_name }}{% else %}Match {{ match.match_number }}{% endif %}
+                                    </small>
+                                    {% if match.is_current %}
+                                    <span class="badge bg-warning text-dark float-end">LIVE</span>
+                                    {% elif match.is_completed %}
+                                    <span class="badge bg-success float-end">Done</span>
+                                    {% endif %}
+                                    
+                                    <div class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team1_id %}text-success{% endif %}">
+                                        <span>{{ match.team1.name if match.team1 else 'TBD' }}</span>
+                                        <strong>{{ match.team1_score }}</strong>
+                                    </div>
+                                    <hr class="my-1">
+                                    <div class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team2_id %}text-success{% endif %}">
+                                        <span>{{ match.team2.name if match.team2 else 'TBD' }}</span>
+                                        <strong>{{ match.team2_score }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

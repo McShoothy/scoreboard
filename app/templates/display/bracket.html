@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tournament.name }} - Bracket{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    html, body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #0a0a12;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    
+    main.container {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Full screen bracket container */
+    .bracket-screen {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(135deg, #0a0a12 0%, #14141f 50%, #0a0a12 100%);
+        position: relative;
+    }
+    
+    /* Subtle animated background */
+    .bracket-screen::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: 
+            radial-gradient(circle at 20% 80%, rgba(255, 107, 0, 0.05) 0%, transparent 40%),
+            radial-gradient(circle at 80% 20%, rgba(255, 107, 0, 0.05) 0%, transparent 40%);
+        pointer-events: none;
+    }
+    
+    /* Header */
+    .bracket-header {
+        flex-shrink: 0;
+        height: 60px;
+        background: linear-gradient(90deg, #1a1a2e, #252538, #1a1a2e);
+        border-bottom: 3px solid #ff6b00;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 2rem;
+        z-index: 10;
+    }
+    
+    .tournament-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: white;
+    }
+    
+    .tournament-title i {
+        color: #ffd700;
+    }
+    
+    .tournament-stats {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #ff6b00;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.6);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Main bracket area */
+    .bracket-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        overflow: hidden;
+    }
+    
+    /* Bracket grid - uses CSS Grid for perfect alignment */
+    .bracket-grid {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        height: 100%;
+        max-height: calc(100vh - 80px);
+    }
+    
+    /* Round column */
+    .round {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-width: 200px;
+        max-width: 280px;
+    }
+    
+    .round-title {
+        flex-shrink: 0;
+        text-align: center;
+        padding: 0.5rem 1rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #ff6b00, #ff8533);
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: white;
+    }
+    
+    .round-title.finals {
+        background: linear-gradient(135deg, #ffd700, #ffaa00);
+        color: #1a1a2e;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+    }
+    
+    .round-matches {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        padding: 0.5rem 0;
+    }
+    
+    /* Connector lines between rounds */
+    .connector {
+        width: 40px;
+        flex-shrink: 0;
+        position: relative;
+    }
+    
+    /* Match card */
+    .match {
+        background: #1c1c2a;
+        border: 2px solid #3a3a50;
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 0.25rem 0;
+        transition: all 0.3s ease;
+    }
+    
+    .match.current {
+        border-color: #ff6b00;
+        box-shadow: 0 0 20px rgba(255, 107, 0, 0.4);
+    }
+    
+    .match.completed {
+        opacity: 0.7;
+    }
+    
+    .match.bye {
+        opacity: 0.4;
+        border-style: dashed;
+    }
+    
+    /* Live indicator */
+    .live-indicator {
+        background: linear-gradient(90deg, #ff6b00, #ff4444);
+        color: white;
+        text-align: center;
+        padding: 0.2rem;
+        font-size: 0.65rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        animation: livePulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes livePulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    
+    /* Team row */
+    .team {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .team:last-child {
+        border-bottom: none;
+    }
+    
+    .team.winner {
+        background: linear-gradient(90deg, rgba(81, 207, 102, 0.15), transparent);
+    }
+    
+    .team-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .team-name {
+        font-weight: 500;
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: white;
+    }
+    
+    .team.winner .team-name {
+        color: #51cf66;
+    }
+    
+    .team-name.tbd {
+        color: rgba(255,255,255,0.3);
+        font-style: italic;
+    }
+    
+    .trophy-icon {
+        color: #ffd700;
+        font-size: 0.8rem;
+    }
+    
+    .team-score {
+        font-size: 1.2rem;
+        font-weight: bold;
+        min-width: 30px;
+        text-align: right;
+        color: rgba(255,255,255,0.8);
+    }
+    
+    .team.winner .team-score {
+        color: #51cf66;
+        text-shadow: 0 0 10px rgba(81, 207, 102, 0.5);
+    }
+    
+    /* Champion highlight */
+    .match.champion {
+        border-color: #ffd700;
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+    }
+    
+    .match.champion .team.winner {
+        background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), transparent);
+    }
+    
+    .match.champion .team.winner .team-name {
+        color: #ffd700;
+    }
+    
+    /* Responsive scaling */
+    @media (max-width: 1400px) {
+        .round { min-width: 180px; }
+        .team-name { font-size: 0.85rem; }
+    }
+    
+    @media (max-width: 1200px) {
+        .round { min-width: 160px; }
+        .bracket-header { height: 50px; padding: 0 1rem; }
+        .tournament-title { font-size: 1.2rem; }
+    }
+    
+    @media (max-width: 900px) {
+        .round { min-width: 140px; }
+        .connector { width: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bracket-screen">
+    <div class="bracket-header">
+        <div class="tournament-title">
+            <i class="bi bi-trophy-fill"></i>
+            <span>{{ tournament.name }}</span>
+        </div>
+        <div class="tournament-stats">
+            {% set total = matches|length %}
+            {% set completed = matches|selectattr('is_completed')|list|length %}
+            <div class="stat-item">
+                <div class="stat-value">{{ completed }}/{{ total }}</div>
+                <div class="stat-label">Matches</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ teams|length }}</div>
+                <div class="stat-label">Teams</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bracket-area" id="bracketArea">
+        <div class="bracket-grid" id="bracketGrid">
+            {% set rounds = matches|map(attribute='round_number')|list|unique|sort|list %}
+            {% set num_rounds = rounds|length %}
+            
+            {% for round_num in rounds %}
+            {% set round_matches = matches|selectattr('round_number', 'eq', round_num)|list %}
+            {% set is_finals = loop.last %}
+            {% set is_semis = loop.index == num_rounds - 1 and num_rounds > 2 %}
+            
+            <div class="round" data-round="{{ round_num }}">
+                <div class="round-title {% if is_finals %}finals{% endif %}">
+                    {% if is_finals %}
+                        <i class="bi bi-trophy-fill me-1"></i>Finals
+                    {% elif is_semis %}
+                        Semi-Finals
+                    {% else %}
+                        Round {{ round_num }}
+                    {% endif %}
+                </div>
+                <div class="round-matches">
+                    {% for match in round_matches|sort(attribute='match_number') %}
+                    {% set is_champion = is_finals and match.is_completed %}
+                    <div class="match {% if match.is_current %}current{% elif match.is_completed %}completed{% endif %} {% if is_champion %}champion{% endif %}"
+                         data-match-id="{{ match.id }}">
+                        
+                        {% if match.is_current %}
+                        <div class="live-indicator">
+                            <i class="bi bi-broadcast me-1"></i>LIVE
+                        </div>
+                        {% endif %}
+                        
+                        <div class="team {% if match.winner_id == match.team1_id %}winner{% endif %}">
+                            <div class="team-info">
+                                {% if match.winner_id == match.team1_id %}
+                                <i class="bi bi-trophy-fill trophy-icon"></i>
+                                {% endif %}
+                                <span class="team-name {% if not match.team1 %}tbd{% endif %}">
+                                    {{ match.team1.name if match.team1 else 'TBD' }}
+                                </span>
+                            </div>
+                            <span class="team-score">{{ match.team1_score }}</span>
+                        </div>
+                        
+                        <div class="team {% if match.winner_id == match.team2_id %}winner{% endif %}">
+                            <div class="team-info">
+                                {% if match.winner_id == match.team2_id %}
+                                <i class="bi bi-trophy-fill trophy-icon"></i>
+                                {% endif %}
+                                <span class="team-name {% if not match.team2 %}tbd{% endif %}">
+                                    {{ match.team2.name if match.team2 else 'TBD' }}
+                                </span>
+                            </div>
+                            <span class="team-score">{{ match.team2_score }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            {% if not loop.last %}
+            <div class="connector"></div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const socket = io();
+    const tournamentId = {{ tournament.id }};
+    
+    // Auto-scale bracket to fit screen
+    function scaleBracket() {
+        const area = document.getElementById('bracketArea');
+        const grid = document.getElementById('bracketGrid');
+        
+        if (!area || !grid) return;
+        
+        // Reset scale
+        grid.style.transform = 'scale(1)';
+        
+        const areaRect = area.getBoundingClientRect();
+        const gridRect = grid.getBoundingClientRect();
+        
+        // Calculate scale to fit with some padding
+        const scaleX = (areaRect.width - 40) / gridRect.width;
+        const scaleY = (areaRect.height - 40) / gridRect.height;
+        const scale = Math.min(scaleX, scaleY, 1.5); // Cap at 1.5x
+        
+        // Apply scale, minimum 0.4
+        grid.style.transform = `scale(${Math.max(0.4, scale)})`;
+        grid.style.transformOrigin = 'center center';
+    }
+    
+    // Initialize
+    window.addEventListener('load', scaleBracket);
+    window.addEventListener('resize', scaleBracket);
+    
+    // Socket events
+    socket.on('connect', function() {
+        socket.emit('join_tournament', { tournament_id: tournamentId });
+    });
+    
+    socket.on('score_update', function(data) {
+        const match = document.querySelector(`.match[data-match-id="${data.match_id}"]`);
+        if (match) {
+            const scores = match.querySelectorAll('.team-score');
+            if (scores[0]) scores[0].textContent = data.team1_score;
+            if (scores[1]) scores[1].textContent = data.team2_score;
+        }
+    });
+    
+    socket.on('match_complete', function(data) {
+        setTimeout(() => location.reload(), 500);
+    });
+    
+    socket.on('current_match_changed', function(data) {
+        location.reload();
+    });
+    
+    socket.on('bracket_update', function(data) {
+        location.reload();
+    });
+    
+    // Refresh periodically as backup
+    setTimeout(() => location.reload(), 120000);
+</script>
+{% endblock %}

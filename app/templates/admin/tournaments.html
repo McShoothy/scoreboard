@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Tournaments - RobotUprising{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-trophy me-2"></i>Manage Tournaments</h1>
+    <a href="{{ url_for('admin.admin_index') }}" class="btn btn-outline-light">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create New Tournament</h5>
+            </div>
+            <div class="card-body">
+                {% if teams|length >= 2 %}
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Tournament Name</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tournament Format</label>
+                        <select name="format" class="form-select" id="format-select" onchange="updateFormatDescription()">
+                            <option value="single_elimination" selected>🏆 Single Elimination</option>
+                            <option value="double_elimination">🏆🏆 Double Elimination</option>
+                            <option value="round_robin">🔄 Round Robin (Everyone vs Everyone)</option>
+                            <option value="round_robin_playoffs">🔄➡️🏆 Round Robin + Top 4 Playoffs</option>
+                            <option value="swiss">🎯 Swiss System</option>
+                        </select>
+                        <div id="format-description" class="form-text mt-2">
+                            <small class="text-warning">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <span id="format-desc-text">Lose once and you're out. Fast and decisive.</span>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Match Timer Duration</label>
+                        <div class="input-group">
+                            <input type="number" name="timer_minutes" class="form-control" value="2" min="0" max="59" style="max-width: 80px;">
+                            <span class="input-group-text">min</span>
+                            <input type="number" name="timer_seconds" class="form-control" value="30" min="0" max="59" style="max-width: 80px;">
+                            <span class="input-group-text">sec</span>
+                        </div>
+                        <small class="text-muted">Default: 2:30</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">Select Teams <span id="min-teams-text">(min 2)</span></label>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="selectAllTeams()">
+                                <i class="bi bi-check-all me-1"></i>Select All
+                            </button>
+                        </div>
+                        <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto; background: var(--ru-dark);">
+                            {% for team in teams %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input team-checkbox" type="checkbox" name="teams" value="{{ team.id }}" id="team{{ team.id }}">
+                                <label class="form-check-label" for="team{{ team.id }}">
+                                    {{ team.name }} <small class="text-muted">({{ team.player1 }} & {{ team.player2 }})</small>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-ru w-100">
+                        <i class="bi bi-plus-circle me-1"></i>Create Tournament
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-warning text-center py-4">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    You need at least 2 teams to create a tournament.
+                    <br><br>
+                    <a href="{{ url_for('admin.manage_teams') }}" class="btn btn-ru">Add Teams</a>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Existing Tournaments</h5>
+            </div>
+            <div class="card-body">
+                {% if tournaments %}
+                <div class="list-group list-group-flush">
+                    {% for tournament in tournaments %}
+                    <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ tournament.name }}</h6>
+                            <small class="text-muted">
+                                {% if tournament.format == 'single_elimination' %}
+                                <span class="badge bg-info">🏆 Single Elim</span>
+                                {% elif tournament.format == 'double_elimination' %}
+                                <span class="badge bg-info">🏆🏆 Double Elim</span>
+                                {% elif tournament.format == 'round_robin' %}
+                                <span class="badge bg-primary">🔄 Round Robin</span>
+                                {% elif tournament.format == 'round_robin_playoffs' %}
+                                <span class="badge bg-primary">🔄➡️🏆 RR + Playoffs</span>
+                                {% elif tournament.format == 'swiss' %}
+                                <span class="badge bg-warning text-dark">🎯 Swiss</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Unknown</span>
+                                {% endif %}
+                                {% if tournament.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Completed</span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('admin.view_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-outline-light me-1">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            <form method="POST" action="{{ url_for('admin.delete_tournament', tournament_id=tournament.id) }}" 
+                                  style="display: inline;" 
+                                  onsubmit="return confirm('Delete this tournament and all its matches?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No tournaments created yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectAllTeams() {
+    const checkboxes = document.querySelectorAll('.team-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+const formatDescriptions = {
+    'single_elimination': 'Lose once and you\'re out. Fast and decisive.',
+    'double_elimination': 'Must lose twice to be eliminated. Losers bracket gives second chance.',
+    'round_robin': 'Every team plays every other team. Winner determined by total points.',
+    'round_robin_playoffs': 'Everyone plays everyone first, then top 4 teams go to playoff bracket.',
+    'swiss': 'Teams paired by similar records each round. No team plays twice. Efficient for many teams.'
+};
+
+const formatMinTeams = {
+    'single_elimination': 2,
+    'double_elimination': 3,
+    'round_robin': 3,
+    'round_robin_playoffs': 5,
+    'swiss': 4
+};
+
+function updateFormatDescription() {
+    const format = document.getElementById('format-select').value;
+    document.getElementById('format-desc-text').textContent = formatDescriptions[format];
+    document.getElementById('min-teams-text').textContent = '(min ' + formatMinTeams[format] + ')';
+}
+</script>
+{% endblock %}

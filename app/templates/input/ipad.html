@@ -1,0 +1,1617 @@
+{% extends "base.html" %}
+
+{% block title %}iPad Control - {{ tournament.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Score Controls */
+    .score-section {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .team-panel {
+        background: rgba(255,255,255,0.05);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .team-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 0.3rem;
+    }
+    .team-players {
+        font-size: 0.9rem;
+        color: #9a9ab0;
+        margin-bottom: 0.5rem;
+    }
+    .score-display {
+        font-size: 5rem;
+        font-weight: bold;
+        line-height: 1;
+        margin: 0.5rem 0;
+    }
+    .score-btn {
+        width: 70px;
+        height: 70px;
+        font-size: 2rem;
+        border-radius: 50%;
+        margin: 0 0.5rem;
+    }
+    .team-1 .team-name, .team-1 .score-display { color: #4dabf7; }
+    .team-2 .team-name, .team-2 .score-display { color: #ff6b6b; }
+    
+    /* VS Badge */
+    .vs-badge {
+        font-size: 1.5rem;
+        color: var(--ru-primary);
+        font-weight: bold;
+    }
+    
+    /* Quick Controls */
+    .control-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    .control-btn {
+        min-height: 80px;
+        font-size: 1rem;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+    }
+    .control-btn i {
+        font-size: 1.5rem;
+    }
+    .control-btn.large {
+        grid-column: span 2;
+        min-height: 90px;
+        font-size: 1.3rem;
+    }
+    .control-btn.large i {
+        font-size: 2rem;
+    }
+    
+    /* Mode Buttons */
+    .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    .mode-btn {
+        padding: 1rem;
+        font-size: 0.9rem;
+        border-radius: 10px;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        min-height: 80px;
+        position: relative;
+        transition: all 0.2s;
+    }
+    .mode-btn.active {
+        background-color: var(--ru-primary) !important;
+        border-color: var(--ru-primary) !important;
+    }
+    .mode-btn.recommended {
+        border-color: #69db7c !important;
+        box-shadow: 0 0 10px rgba(105, 219, 124, 0.3);
+    }
+    .mode-btn.recommended::after {
+        content: '★';
+        position: absolute;
+        top: 5px;
+        right: 8px;
+        color: #69db7c;
+        font-size: 0.8rem;
+    }
+    .mode-btn.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    .mode-btn-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+    }
+    .mode-btn-header i {
+        font-size: 1.2rem;
+    }
+    .mode-btn-info {
+        font-size: 0.7rem;
+        color: rgba(255,255,255,0.6);
+        margin-top: 0.3rem;
+        line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .mode-btn.active .mode-btn-info {
+        color: rgba(255,255,255,0.8);
+    }
+    
+    /* Smart Suggestion */
+    .smart-suggestion {
+        background: rgba(105, 219, 124, 0.15);
+        border: 1px solid rgba(105, 219, 124, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .smart-suggestion i {
+        color: #69db7c;
+    }
+    .smart-suggestion-action {
+        margin-left: auto;
+        color: #69db7c;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    
+    /* Timer Section */
+    .timer-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .timer-input {
+        width: 60px;
+        text-align: center;
+        font-size: 1.2rem;
+    }
+    
+    /* Status Bar */
+    .status-bar {
+        background: rgba(255, 107, 0, 0.1);
+        border: 1px solid var(--ru-primary);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    /* Panels */
+    .control-panel {
+        background: #1c1c2a;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.9rem;
+        color: #9a9ab0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    /* Screen Selector Dropdown */
+    .screen-selector-wrapper {
+        text-transform: none;
+        letter-spacing: normal;
+    }
+    .screen-selector-wrapper .dropdown-toggle {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
+    }
+    .screen-selector-wrapper .dropdown-menu {
+        min-width: 180px;
+        background: var(--ru-secondary);
+        border: 1px solid var(--ru-border);
+    }
+    .screen-selector-wrapper .dropdown-item {
+        color: var(--ru-text);
+        padding: 0.5rem 1rem;
+    }
+    .screen-selector-wrapper .dropdown-item:hover {
+        background: var(--ru-primary);
+        color: white;
+    }
+    .screen-selector-wrapper .dropdown-item.active {
+        background: var(--ru-primary);
+        color: white;
+    }
+    .screen-selector-wrapper .dropdown-divider {
+        border-color: var(--ru-border);
+    }
+    #selected-screen-label {
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .status-dot-sm {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    .status-dot-sm.online {
+        background: #51cf66;
+    }
+    .status-dot-sm.offline {
+        background: #868e96;
+    }
+    
+    /* Winner Confirmation Modal */
+    .confirm-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 9999;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+    }
+    .confirm-overlay.active {
+        display: flex;
+    }
+    .confirm-panel {
+        background: #1c1c2a;
+        border: 3px solid var(--ru-primary);
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 450px;
+        width: 100%;
+        text-align: center;
+    }
+    .confirm-title {
+        font-size: 1.3rem;
+        color: #ffd700;
+        margin-bottom: 1rem;
+    }
+    .confirm-winner-name {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #69db7c;
+        margin-bottom: 0.5rem;
+    }
+    .confirm-score {
+        font-size: 2rem;
+        color: #e8e8e8;
+        margin-bottom: 1.5rem;
+    }
+    .overtime-badge {
+        display: inline-block;
+        background: #ff6b00;
+        color: white;
+        padding: 0.3rem 1rem;
+        border-radius: 20px;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Message Panel */
+    .message-panel {
+        display: none;
+    }
+    .message-panel.show {
+        display: block;
+    }
+    .quick-msg-btn {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    /* Match Selector */
+    .match-selector {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .match-option {
+        padding: 0.5rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        background: rgba(255,255,255,0.05);
+        transition: all 0.2s;
+    }
+    .match-option:hover {
+        background: rgba(255,255,255,0.1);
+    }
+    .match-option.current {
+        border: 2px solid var(--ru-primary);
+        background: rgba(255, 107, 0, 0.1);
+    }
+    
+    /* TV Selector */
+    .tv-selector {
+        margin-bottom: 1rem;
+    }
+    .tv-pair-input {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+    .tv-code-input {
+        font-family: monospace;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        text-align: center;
+        font-size: 1.1rem;
+        flex: 1;
+        max-width: 150px;
+    }
+    .tv-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .tv-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 107, 0, 0.15);
+        border: 1px solid var(--ru-primary);
+        border-radius: 20px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+        position: relative;
+    }
+    .tv-chip .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #51cf66;
+        animation: pulse-green 2s infinite;
+    }
+    .tv-chip.offline .status-dot {
+        background: #868e96;
+        animation: none;
+    }
+    .tv-chip.offline {
+        opacity: 0.6;
+        border-color: #868e96;
+    }
+    @keyframes pulse-green {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    .tv-chip .tv-code {
+        font-family: monospace;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+    .tv-chip .remove-tv {
+        cursor: pointer;
+        color: #ff6b6b;
+        margin-left: 0.3rem;
+    }
+    .tv-chip .remove-tv:hover {
+        color: #ff4444;
+    }
+    .no-tvs-message {
+        color: #ffd43b;
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        background: rgba(255, 212, 59, 0.1);
+        border-radius: 8px;
+        text-align: center;
+    }
+    .tv-all-btn {
+        font-size: 0.75rem;
+    }
+    
+    /* Theme Selector Styles */
+    .theme-grid {
+        padding: 0.5rem 0;
+    }
+    .theme-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+    .theme-btn.active {
+        background: var(--ru-primary);
+        border-color: var(--ru-primary);
+        color: white;
+    }
+    .theme-btn:hover {
+        transform: scale(1.02);
+    }
+    .theme-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.3);
+    }
+    .theme-section h6 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Status Bar -->
+<div class="status-bar">
+    <div>
+        <strong>{{ tournament.name }}</strong>
+        <span class="ms-2 badge bg-secondary" id="current-mode-badge">Loading...</span>
+    </div>
+    <a href="{{ url_for('display.display_live', tournament_id=tournament.id) }}" target="_blank" class="btn btn-sm btn-outline-warning">
+        <i class="bi bi-tv"></i>
+    </a>
+</div>
+
+<!-- Score Controls -->
+<div class="score-section" id="score-section">
+    <div class="row align-items-center g-3">
+        <!-- Team 1 -->
+        <div class="col-5">
+            <div class="team-panel team-1">
+                <div class="team-name" id="team1-name">{{ current_match.team1.name if current_match and current_match.team1 else 'TBD' }}</div>
+                <div class="team-players" id="team1-players">{{ (current_match.team1.player1 ~ ' & ' ~ current_match.team1.player2) if current_match and current_match.team1 else '-' }}</div>
+                <div class="score-display" id="team1-score">{{ current_match.team1_score if current_match else 0 }}</div>
+                <div>
+                    <button class="btn btn-outline-danger score-btn" onclick="updateScore(1, -1)">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button class="btn btn-success score-btn" onclick="updateScore(1, 1)">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- VS -->
+        <div class="col-2 text-center">
+            <div class="vs-badge">VS</div>
+        </div>
+        
+        <!-- Team 2 -->
+        <div class="col-5">
+            <div class="team-panel team-2">
+                <div class="team-name" id="team2-name">{{ current_match.team2.name if current_match and current_match.team2 else 'TBD' }}</div>
+                <div class="team-players" id="team2-players">{{ (current_match.team2.player1 ~ ' & ' ~ current_match.team2.player2) if current_match and current_match.team2 else '-' }}</div>
+                <div class="score-display" id="team2-score">{{ current_match.team2_score if current_match else 0 }}</div>
+                <div>
+                    <button class="btn btn-outline-danger score-btn" onclick="updateScore(2, -1)">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button class="btn btn-success score-btn" onclick="updateScore(2, 1)">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Controls -->
+<div class="control-panel">
+    <div class="panel-title"><i class="bi bi-controller"></i> Match Controls</div>
+    <div class="control-grid">
+        <button class="btn btn-success control-btn large" onclick="startCountdown()">
+            <i class="bi bi-play-circle-fill"></i>
+            <span>Start Match (3-2-1)</span>
+        </button>
+        <button class="btn btn-primary control-btn" onclick="declareWinner(1)">
+            <i class="bi bi-trophy-fill"></i>
+            <span id="win-btn-1">Team 1 Wins</span>
+        </button>
+        <button class="btn btn-danger control-btn" onclick="declareWinner(2)">
+            <i class="bi bi-trophy-fill"></i>
+            <span id="win-btn-2">Team 2 Wins</span>
+        </button>
+    </div>
+</div>
+
+<!-- Timer Settings -->
+<div class="control-panel">
+    <div class="panel-title"><i class="bi bi-stopwatch"></i> Timer</div>
+    <div class="timer-section">
+        <div class="input-group" style="width: auto;">
+            <input type="number" id="timer-minutes" class="form-control timer-input" value="{{ (tournament.timer_duration // 60) }}" min="0" max="59">
+            <span class="input-group-text">:</span>
+            <input type="number" id="timer-seconds" class="form-control timer-input" value="{{ '%02d' % (tournament.timer_duration % 60) }}" min="0" max="59">
+        </div>
+        <button class="btn btn-warning btn-sm" onclick="updateTimer()">
+            <i class="bi bi-check-lg me-1"></i>Set
+        </button>
+        <span class="text-muted small">Default: 2:30</span>
+    </div>
+</div>
+
+<!-- Display Modes -->
+<div class="control-panel">
+    <div class="panel-title"><i class="bi bi-display"></i> TV Display</div>
+    
+    <!-- Smart Suggestion -->
+    <div class="smart-suggestion" id="smart-suggestion" style="display: none;">
+        <i class="bi bi-lightbulb"></i>
+        <span id="suggestion-text">Suggestion</span>
+        <span class="smart-suggestion-action" id="suggestion-action" onclick="applySuggestion()">Apply →</span>
+    </div>
+    
+    <div class="mode-grid">
+        <button class="btn btn-outline-light mode-btn" data-mode="scoreboard" onclick="setMode('scoreboard')" id="mode-scoreboard">
+            <div class="mode-btn-header">
+                <i class="bi bi-trophy"></i> Scoreboard
+            </div>
+            <div class="mode-btn-info" id="scoreboard-info">No match selected</div>
+        </button>
+        <button class="btn btn-outline-light mode-btn" data-mode="waiting" onclick="setMode('waiting')" id="mode-waiting">
+            <div class="mode-btn-header">
+                <i class="bi bi-hourglass-split"></i> Waiting
+            </div>
+            <div class="mode-btn-info" id="waiting-info">Between matches</div>
+        </button>
+        <button class="btn btn-outline-light mode-btn" data-mode="bracket" onclick="setMode('bracket')" id="mode-bracket">
+            <div class="mode-btn-header">
+                <i class="bi bi-diagram-3"></i> Bracket
+            </div>
+            <div class="mode-btn-info" id="bracket-info">Full tournament view</div>
+        </button>
+        <button class="btn btn-outline-light mode-btn" data-mode="message" onclick="setMode('message')" id="mode-message">
+            <div class="mode-btn-header">
+                <i class="bi bi-chat-square-text"></i> Message
+            </div>
+            <div class="mode-btn-info">Custom announcement</div>
+        </button>
+    </div>
+    
+    <!-- Message Panel -->
+    <div class="message-panel mt-3" id="message-panel">
+        <textarea class="form-control mb-2" id="custom-message" rows="2" placeholder="Enter message..."></textarea>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <button class="btn btn-outline-warning quick-msg-btn" onclick="quickMessage('🎮 Next match soon!')">Next Match</button>
+            <button class="btn btn-outline-warning quick-msg-btn" onclick="quickMessage('⏸️ Break - Back in 5 min')">Break</button>
+            <button class="btn btn-outline-warning quick-msg-btn" onclick="quickMessage('🏆 Finals coming up!')">Finals</button>
+        </div>
+        <button class="btn btn-ru btn-sm w-100" onclick="sendMessage()">
+            <i class="bi bi-send me-1"></i>Send Message
+        </button>
+    </div>
+</div>
+
+<!-- Connected TVs Panel -->
+<div class="control-panel">
+    <div class="panel-title">
+        <i class="bi bi-tv"></i> Connected TVs
+        <div class="screen-selector-wrapper ms-auto">
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="screenSelectorBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-broadcast me-1"></i><span id="selected-screen-label">Select</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" id="screen-selector-menu">
+                    <li><a class="dropdown-item" href="#" onclick="selectScreen('all'); return false;">
+                        <i class="bi bi-collection me-2"></i>All Screens
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <!-- Individual TV options will be populated dynamically -->
+                    <li id="no-screens-option"><span class="dropdown-item text-muted">No TVs connected</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tv-selector">
+        <div class="tv-pair-input">
+            <input type="text" id="tv-code-input" class="form-control tv-code-input" placeholder="CODE" maxlength="6">
+            <button class="btn btn-ru" onclick="addTV()">
+                <i class="bi bi-plus-lg me-1"></i>Add
+            </button>
+            <button class="btn btn-outline-info btn-sm" onclick="discoverTVs()" title="Discover active TVs">
+                <i class="bi bi-search"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm" onclick="removeOfflineTVs()" title="Remove offline TVs" id="cleanup-btn" style="display: none;">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+        
+        <div class="tv-list" id="tv-list">
+            <!-- TV chips will be added here dynamically -->
+        </div>
+        
+        <div class="no-tvs-message" id="no-tvs-message">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            No TVs connected. Enter a code or 
+            <a href="#" onclick="discoverTVs(); return false;" class="text-warning">discover active TVs</a>
+        </div>
+    </div>
+</div>
+
+<!-- Match Selector (Collapsible) -->
+<div class="control-panel">
+    <div class="panel-title" data-bs-toggle="collapse" data-bs-target="#matchSelector" style="cursor: pointer;">
+        <i class="bi bi-list-ul"></i> Select Match 
+        <i class="bi bi-chevron-down ms-auto"></i>
+    </div>
+    <div class="collapse" id="matchSelector">
+        <div class="match-selector">
+            {% for match in matches %}
+            <div class="match-option {% if match.is_current %}current{% endif %}" 
+                 onclick="selectMatch({{ match.id }})" 
+                 data-match-id="{{ match.id }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">R{{ match.round_number }}.M{{ match.match_number }}</small>
+                        {% if match.is_current %}<span class="badge bg-warning text-dark ms-1">LIVE</span>{% endif %}
+                        {% if match.is_completed %}<span class="badge bg-success ms-1">Done</span>{% endif %}
+                    </div>
+                    <strong>{{ match.team1_score }} - {{ match.team2_score }}</strong>
+                </div>
+                <div class="small">
+                    {{ match.team1.name if match.team1 else 'TBD' }} vs {{ match.team2.name if match.team2 else 'TBD' }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="d-flex gap-2 mt-3">
+    <button class="btn btn-outline-secondary flex-fill" onclick="refreshTV()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh TV
+    </button>
+    <a href="{{ url_for('admin.view_tournament', tournament_id=tournament.id) }}" class="btn btn-outline-info flex-fill">
+        <i class="bi bi-gear me-1"></i>Admin
+    </a>
+</div>
+
+<!-- Theme Selector Panel -->
+<div class="control-panel mt-3">
+    <div class="panel-title" data-bs-toggle="collapse" data-bs-target="#themeSelector" style="cursor: pointer;">
+        <i class="bi bi-palette"></i> Display Theme 
+        <span class="badge bg-secondary ms-2" id="current-theme-badge">Robot Orange</span>
+        <i class="bi bi-chevron-down ms-auto"></i>
+    </div>
+    <div class="collapse" id="themeSelector">
+        <div class="theme-grid mt-2">
+            <div class="theme-section">
+                <h6 class="text-muted mb-2"><i class="bi bi-moon-fill me-1"></i>Dark Themes</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-light theme-btn" data-theme="dark-orange" onclick="setTheme('dark-orange')">
+                        <span class="theme-dot" style="background: #ff6b00;"></span>
+                        Robot Orange
+                    </button>
+                    <button class="btn btn-outline-light theme-btn" data-theme="hacker" onclick="setTheme('hacker')">
+                        <span class="theme-dot" style="background: #00ff41;"></span>
+                        Ultra Hacker
+                    </button>
+                    <button class="btn btn-outline-light theme-btn" data-theme="midnight" onclick="setTheme('midnight')">
+                        <span class="theme-dot" style="background: #4a90d9;"></span>
+                        Midnight Blue
+                    </button>
+                    <button class="btn btn-outline-light theme-btn" data-theme="sunset" onclick="setTheme('sunset')">
+                        <span class="theme-dot" style="background: #ff7b54;"></span>
+                        Warm Sunset
+                    </button>
+                </div>
+            </div>
+            <div class="theme-section mt-3">
+                <h6 class="text-muted mb-2"><i class="bi bi-sun-fill me-1"></i>Light Themes</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-light theme-btn" data-theme="princess" onclick="setTheme('princess')">
+                        <span class="theme-dot" style="background: #ff69b4;"></span>
+                        Pink Princess
+                    </button>
+                    <button class="btn btn-outline-light theme-btn" data-theme="minimal" onclick="setTheme('minimal')">
+                        <span class="theme-dot" style="background: #2563eb;"></span>
+                        Clean Minimal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Winner Confirmation Overlay -->
+<div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-panel">
+        <div class="overtime-badge" id="overtime-badge" style="display: none;">
+            <i class="bi bi-lightning-fill me-1"></i>OVERTIME
+        </div>
+        <div class="confirm-title">
+            <i class="bi bi-trophy-fill me-2"></i>Confirm Winner?
+        </div>
+        <div class="confirm-winner-name" id="confirm-winner-name">-</div>
+        <div class="confirm-score">
+            <span id="confirm-team1-score">0</span> - <span id="confirm-team2-score">0</span>
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button class="btn btn-success btn-lg" onclick="confirmWinner()">
+                <i class="bi bi-check-circle me-2"></i>Confirm Winner
+            </button>
+            <button class="btn btn-warning" onclick="adjustScores()">
+                <i class="bi bi-pencil me-2"></i>Adjust Scores
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="cancelConfirmation()">
+                Cancel (Continue Match)
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const tournamentId = {{ tournament.id }};
+    const socket = io();
+    const serverTVCode = '{{ tv_code if tv_code else "" }}';
+    
+    let currentMatchId = {{ current_match.id if current_match else 'null' }};
+    let team1Id = {{ current_match.team1.id if current_match and current_match.team1 else 'null' }};
+    let team2Id = {{ current_match.team2.id if current_match and current_match.team2 else 'null' }};
+    let team1Name = '{{ current_match.team1.name if current_match and current_match.team1 else "" }}';
+    let team2Name = '{{ current_match.team2.name if current_match and current_match.team2 else "" }}';
+    let team1Score = {{ current_match.team1_score if current_match else 0 }};
+    let team2Score = {{ current_match.team2_score if current_match else 0 }};
+    let currentMode = 'scoreboard';
+    let pendingWinner = null;
+    
+    // Connected TVs (stored in localStorage for persistence)
+    let connectedTVs = JSON.parse(localStorage.getItem('connectedTVs_' + tournamentId) || '[]');
+    
+    // Add server TV code if not already in list
+    if (serverTVCode && !connectedTVs.includes(serverTVCode)) {
+        connectedTVs.push(serverTVCode);
+        localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+    }
+    
+    // Initialize TV list on page load
+    function initTVList() {
+        // First fetch active TVs for this tournament from server
+        fetchActiveTVs().then(() => {
+            // Then validate which connected TVs are still active
+            return validateConnectedTVs();
+        }).then(() => {
+            updateTVListDisplay();
+            // Notify all connected TVs that controller is active
+            connectedTVs.forEach(code => {
+                socket.emit('controller_ping', { code: code });
+            });
+        });
+    }
+    
+    // Fetch active TVs for this tournament from server
+    function fetchActiveTVs() {
+        return fetch('/api/tv/sessions')
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error('Failed to fetch TV sessions: ' + r.status);
+                }
+                return r.json();
+            })
+            .then(sessions => {
+                // Filter to TVs for this tournament that we haven't already added
+                sessions.forEach(tv => {
+                    if (tv.tournament_id === tournamentId && tv.is_active && !connectedTVs.includes(tv.code)) {
+                        connectedTVs.push(tv.code);
+                    }
+                });
+                localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+                console.log('Active TVs for tournament:', connectedTVs);
+            })
+            .catch(err => {
+                console.error('Error fetching active TVs:', err);
+            });
+    }
+    
+    // Discover and add all active TVs for this tournament
+    function discoverTVs() {
+        fetch('/api/tv/sessions')
+            .then(r => {
+                if (!r.ok) throw new Error('Failed to fetch');
+                return r.json();
+            })
+            .then(sessions => {
+                let added = 0;
+                let newTVs = [];
+                sessions.forEach(tv => {
+                    if (tv.is_active && !connectedTVs.includes(tv.code)) {
+                        connectedTVs.push(tv.code);
+                        newTVs.push(tv.code);
+                        added++;
+                    }
+                });
+                localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+                
+                // Send each new TV the command to redirect to this tournament's live display
+                newTVs.forEach(code => {
+                    fetch('/api/tv/' + code + '/control', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            connected: true,
+                            tournament_id: tournamentId,
+                            redirect_to_live: true
+                        })
+                    });
+                });
+                
+                if (added > 0) {
+                    updateTVListDisplay();
+                    alert(`Discovered ${added} active TV(s)! They will now show this tournament.`);
+                } else if (sessions.length === 0) {
+                    alert('No active TVs found. Make sure a TV display is open.');
+                } else {
+                    alert('All active TVs are already connected.');
+                }
+            })
+            .catch(err => {
+                console.error('Error discovering TVs:', err);
+                alert('Failed to discover TVs. Please try entering the code manually.');
+            });
+    }
+    
+    // Validate connected TVs against server - remove stale ones
+    function validateConnectedTVs() {
+        if (connectedTVs.length === 0) {
+            return Promise.resolve();
+        }
+        
+        return fetch('/api/tv/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ codes: connectedTVs })
+        })
+        .then(r => {
+            if (!r.ok) {
+                throw new Error('Validation request failed: ' + r.status);
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (data.inactive && data.inactive.length > 0) {
+                console.log('Auto-removing inactive TVs:', data.inactive);
+                // Auto-remove inactive TVs from localStorage
+                connectedTVs = connectedTVs.filter(code => !data.inactive.includes(code));
+                localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+                
+                // Reset selection if selected TV is now inactive
+                if (selectedScreen !== 'all' && data.inactive.includes(selectedScreen)) {
+                    selectedScreen = 'all';
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Error validating TVs:', err);
+        });
+    }
+    
+    // Periodically validate and remove inactive TVs (every 30 seconds)
+    setInterval(() => {
+        fetchActiveTVs().then(() => {
+            return validateConnectedTVs();
+        }).then(() => {
+            updateTVListDisplay();
+        });
+    }, 30000);
+    
+    function addTV() {
+        const input = document.getElementById('tv-code-input');
+        const code = input.value.toUpperCase().trim();
+        
+        if (code.length !== 6) {
+            alert('Please enter a 6-character TV code');
+            return;
+        }
+        
+        if (connectedTVs.includes(code)) {
+            alert('This TV is already connected');
+            return;
+        }
+        
+        // Verify TV exists and add it
+        fetch('/api/tv/' + code + '/state')
+            .then(r => {
+                if (!r.ok) throw new Error('Invalid code');
+                return r.json();
+            })
+            .then(data => {
+                connectedTVs.push(code);
+                localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+                updateTVListDisplay();
+                input.value = '';
+                
+                // Pair TV with this tournament and tell it to show the live display
+                fetch('/api/tv/' + code + '/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        connected: true,
+                        tournament_id: tournamentId,
+                        redirect_to_live: true
+                    })
+                });
+            })
+            .catch(err => {
+                alert('Invalid TV code. Check the code on the TV screen.');
+            });
+    }
+    
+    function removeTV(code) {
+        connectedTVs = connectedTVs.filter(c => c !== code);
+        localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+        updateTVListDisplay();
+    }
+    
+    // Track which TVs are currently online
+    let onlineTVs = new Set();
+    
+    function updateTVListDisplay() {
+        const listEl = document.getElementById('tv-list');
+        const noTVsEl = document.getElementById('no-tvs-message');
+        
+        if (connectedTVs.length === 0) {
+            listEl.innerHTML = '';
+            noTVsEl.style.display = 'block';
+        } else {
+            noTVsEl.style.display = 'none';
+            listEl.innerHTML = connectedTVs.map(code => `
+                <div class="tv-chip ${onlineTVs.has(code) ? '' : 'offline'}" data-code="${code}">
+                    <span class="status-dot" title="${onlineTVs.has(code) ? 'Online' : 'Offline'}"></span>
+                    <i class="bi bi-tv"></i>
+                    <span class="tv-code">${code}</span>
+                    <span class="remove-tv" onclick="removeTV('${code}')" title="Disconnect">
+                        <i class="bi bi-x-circle"></i>
+                    </span>
+                </div>
+            `).join('');
+        }
+        
+        // Also update the screen selector dropdown
+        updateScreenSelectorDropdown();
+        
+        // Check status of each TV
+        checkTVStatuses();
+    }
+    
+    // Check which TVs are online
+    function checkTVStatuses() {
+        if (connectedTVs.length === 0) return;
+        
+        fetch('/api/tv/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ codes: connectedTVs })
+        })
+        .then(r => r.json())
+        .then(data => {
+            onlineTVs = new Set(data.active || []);
+            const offlineCount = connectedTVs.length - onlineTVs.size;
+            
+            // Show/hide cleanup button based on offline count
+            const cleanupBtn = document.getElementById('cleanup-btn');
+            if (offlineCount > 0) {
+                cleanupBtn.style.display = 'inline-block';
+                cleanupBtn.title = `Remove ${offlineCount} offline TV${offlineCount > 1 ? 's' : ''}`;
+            } else {
+                cleanupBtn.style.display = 'none';
+            }
+            
+            // Update chip visuals
+            document.querySelectorAll('.tv-chip').forEach(chip => {
+                const code = chip.dataset.code;
+                if (onlineTVs.has(code)) {
+                    chip.classList.remove('offline');
+                    chip.querySelector('.status-dot').title = 'Online';
+                } else {
+                    chip.classList.add('offline');
+                    chip.querySelector('.status-dot').title = 'Offline';
+                }
+            });
+            // Also update dropdown status indicators
+            updateScreenSelectorDropdown();
+        })
+        .catch(err => console.error('Error checking TV status:', err));
+    }
+    
+    // Remove all offline TVs
+    function removeOfflineTVs() {
+        const offlineTVs = connectedTVs.filter(code => !onlineTVs.has(code));
+        if (offlineTVs.length === 0) return;
+        
+        connectedTVs = connectedTVs.filter(code => onlineTVs.has(code));
+        localStorage.setItem('connectedTVs_' + tournamentId, JSON.stringify(connectedTVs));
+        
+        // Reset selection if needed
+        if (selectedScreen !== 'all' && !connectedTVs.includes(selectedScreen)) {
+            selectedScreen = 'all';
+        }
+        
+        updateTVListDisplay();
+        console.log('Removed offline TVs:', offlineTVs);
+    }
+    
+    // Screen selection tracking
+    let selectedScreen = 'all'; // 'all' or a specific TV code
+    
+    function updateScreenSelectorDropdown() {
+        const menu = document.getElementById('screen-selector-menu');
+        const noScreensOption = document.getElementById('no-screens-option');
+        
+        // Remove old TV options (keep "All Screens" and divider)
+        const existingTVOptions = menu.querySelectorAll('.tv-screen-option');
+        existingTVOptions.forEach(el => el.remove());
+        
+        if (connectedTVs.length === 0) {
+            noScreensOption.style.display = 'block';
+            // Reset to 'all' if no TVs
+            selectedScreen = 'all';
+            document.getElementById('selected-screen-label').textContent = 'Select';
+        } else {
+            noScreensOption.style.display = 'none';
+            // Add each connected TV as an option with online status
+            connectedTVs.forEach(code => {
+                const isOnline = onlineTVs.has(code);
+                const li = document.createElement('li');
+                li.className = 'tv-screen-option';
+                li.innerHTML = `<a class="dropdown-item ${selectedScreen === code ? 'active' : ''} ${isOnline ? '' : 'text-muted'}" href="#" onclick="selectScreen('${code}'); return false;">
+                    <span class="status-dot-sm ${isOnline ? 'online' : 'offline'}"></span>
+                    <i class="bi bi-tv me-1"></i>${code}
+                    ${isOnline ? '' : '<small class="ms-1">(offline)</small>'}
+                </a>`;
+                menu.appendChild(li);
+            });
+            
+            // Update the label based on selection
+            updateScreenLabel();
+        }
+    }
+    
+    function selectScreen(screenId) {
+        selectedScreen = screenId;
+        
+        // Update dropdown UI
+        const menu = document.getElementById('screen-selector-menu');
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Find and activate the selected item
+        if (screenId === 'all') {
+            menu.querySelector('.dropdown-item').classList.add('active');
+        } else {
+            const tvOptions = menu.querySelectorAll('.tv-screen-option .dropdown-item');
+            tvOptions.forEach(item => {
+                if (item.textContent.trim() === screenId) {
+                    item.classList.add('active');
+                }
+            });
+        }
+        
+        updateScreenLabel();
+        
+        // Notify server if controlling all TVs
+        if (screenId === 'all' && connectedTVs.length > 0) {
+            fetch('/api/tv/pair-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codes: connectedTVs })
+            });
+        }
+        
+        console.log('Selected screen:', screenId);
+    }
+    
+    function updateScreenLabel() {
+        const label = document.getElementById('selected-screen-label');
+        if (selectedScreen === 'all') {
+            label.textContent = connectedTVs.length > 0 ? 'All (' + connectedTVs.length + ')' : 'Select';
+        } else {
+            label.textContent = selectedScreen;
+        }
+    }
+    
+    // Get which TVs to send commands to based on selection
+    function getTargetTVs() {
+        if (selectedScreen === 'all') {
+            return connectedTVs;
+        } else if (connectedTVs.includes(selectedScreen)) {
+            return [selectedScreen];
+        }
+        return connectedTVs; // fallback to all
+    }
+    
+    // Send command to selected TVs (respects screen selection)
+    function sendToAllTVs(data) {
+        const targetTVs = getTargetTVs();
+        if (targetTVs.length === 0) {
+            console.warn('No TVs connected');
+            return Promise.resolve([]);
+        }
+        
+        return Promise.all(targetTVs.map(code => 
+            fetch('/api/tv/' + code + '/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(r => r.json())
+        ));
+    }
+    
+    // Initialize TV list
+    initTVList();
+    
+    // Update win button labels
+    {% if current_match and current_match.team1 %}
+    document.getElementById('win-btn-1').textContent = '{{ current_match.team1.name }} Wins';
+    {% endif %}
+    {% if current_match and current_match.team2 %}
+    document.getElementById('win-btn-2').textContent = '{{ current_match.team2.name }} Wins';
+    {% endif %}
+    
+    // Socket connection
+    socket.on('connect', function() {
+        socket.emit('join_tournament', { tournament_id: tournamentId });
+    });
+    
+    // Listen for winner pending event
+    socket.on('winner_pending', function(data) {
+        console.log('Winner pending:', data);
+        pendingWinner = data;
+        showWinnerConfirmation(data);
+    });
+    
+    // Listen for score updates from TV or other sources
+    socket.on('score_update', function(data) {
+        if (data.match_id === currentMatchId) {
+            team1Score = data.team1_score;
+            team2Score = data.team2_score;
+            document.getElementById('team1-score').textContent = team1Score;
+            document.getElementById('team2-score').textContent = team2Score;
+        }
+    });
+    
+    // Listen for match completion
+    socket.on('match_complete', function(data) {
+        if (data.match_id === currentMatchId) {
+            // Reload to get next match
+            setTimeout(() => location.reload(), 2000);
+        }
+    });
+    
+    // Load current display state
+    fetch('/api/display/state')
+        .then(r => r.json())
+        .then(data => {
+            currentMode = data.mode;
+            updateModeButtons();
+            document.getElementById('current-mode-badge').textContent = getModeLabel(data.mode);
+        });
+    
+    function updateScore(team, delta) {
+        if (!currentMatchId) {
+            alert('No current match selected');
+            return;
+        }
+        
+        if (team === 1) {
+            team1Score = Math.max(0, team1Score + delta);
+            document.getElementById('team1-score').textContent = team1Score;
+        } else {
+            team2Score = Math.max(0, team2Score + delta);
+            document.getElementById('team2-score').textContent = team2Score;
+        }
+        
+        // Send update to server (will broadcast to TV)
+        socket.emit('update_score', {
+            match_id: currentMatchId,
+            team1_score: team1Score,
+            team2_score: team2Score
+        });
+    }
+    
+    function startCountdown() {
+        if (!currentMatchId) {
+            alert('No current match selected');
+            return;
+        }
+        
+        const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
+        const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+        const timerDuration = minutes * 60 + seconds;
+        
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'countdown',
+                tournament_id: tournamentId
+            })
+        }).then(() => {
+            socket.emit('start_countdown', { 
+                tournament_id: tournamentId,
+                timer_duration: timerDuration
+            });
+            currentMode = 'scoreboard';
+            updateModeButtons();
+            document.getElementById('current-mode-badge').textContent = 'Live Scoreboard';
+        });
+    }
+    
+    function declareWinner(team) {
+        const winnerId = team === 1 ? team1Id : team2Id;
+        const winnerName = team === 1 ? 
+            document.getElementById('team1-name').textContent :
+            document.getElementById('team2-name').textContent;
+        
+        if (!winnerId) {
+            alert('No team assigned');
+            return;
+        }
+        
+        pendingWinner = {
+            match_id: currentMatchId,
+            winner_id: winnerId,
+            winner_name: winnerName,
+            team1_score: team1Score,
+            team2_score: team2Score,
+            is_overtime: false
+        };
+        
+        showWinnerConfirmation(pendingWinner);
+    }
+    
+    function showWinnerConfirmation(data) {
+        document.getElementById('confirm-winner-name').textContent = data.winner_name;
+        document.getElementById('confirm-team1-score').textContent = data.team1_score;
+        document.getElementById('confirm-team2-score').textContent = data.team2_score;
+        document.getElementById('overtime-badge').style.display = data.is_overtime ? 'inline-block' : 'none';
+        document.getElementById('confirm-overlay').classList.add('active');
+        
+        if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+        }
+    }
+    
+    function confirmWinner() {
+        if (!pendingWinner) return;
+        
+        fetch('/api/match/' + pendingWinner.match_id + '/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ winner_id: pendingWinner.winner_id })
+        }).then(() => {
+            hideConfirmation();
+            pendingWinner = null;
+            // Reload to get next match
+            setTimeout(() => location.reload(), 2000);
+        });
+    }
+    
+    function adjustScores() {
+        hideConfirmation();
+        pendingWinner = null;
+        // Scores already visible, user can adjust
+        setMode('scoreboard');
+    }
+    
+    function cancelConfirmation() {
+        hideConfirmation();
+        setMode('scoreboard');
+        pendingWinner = null;
+    }
+    
+    function hideConfirmation() {
+        document.getElementById('confirm-overlay').classList.remove('active');
+    }
+    
+    function selectMatch(matchId) {
+        fetch('/api/match/' + matchId + '/set-current', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(() => {
+            location.reload();
+        });
+    }
+    
+    function getModeLabel(mode) {
+        const labels = {
+            'scoreboard': 'Live Score',
+            'bracket': 'Bracket',
+            'winner': 'Winner',
+            'message': 'Message',
+            'waiting': 'Waiting',
+            'countdown': 'Countdown'
+        };
+        return labels[mode] || mode;
+    }
+    
+    // Track tournament state for smart suggestions
+    let tournamentState = {
+        hasCurrentMatch: false,
+        currentMatchTeams: null,
+        nextMatch: null,
+        completedMatches: 0,
+        totalMatches: 0
+    };
+    let suggestedMode = null;
+    
+    function updateModeButtons() {
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.remove('active', 'recommended');
+            if (btn.dataset.mode === currentMode) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Add recommendation highlight
+        if (suggestedMode && suggestedMode !== currentMode) {
+            const suggestedBtn = document.querySelector(`.mode-btn[data-mode="${suggestedMode}"]`);
+            if (suggestedBtn) {
+                suggestedBtn.classList.add('recommended');
+            }
+        }
+        
+        // Update scoreboard button state
+        const scoreboardBtn = document.getElementById('mode-scoreboard');
+        if (!currentMatchId) {
+            scoreboardBtn.classList.add('disabled');
+        } else {
+            scoreboardBtn.classList.remove('disabled');
+        }
+        
+        // Show/hide message panel
+        document.getElementById('message-panel').classList.toggle('show', currentMode === 'message');
+    }
+    
+    function updateModeInfo() {
+        // Update scoreboard info
+        const scoreboardInfo = document.getElementById('scoreboard-info');
+        if (currentMatchId && team1Name && team2Name) {
+            scoreboardInfo.textContent = `${team1Name} vs ${team2Name}`;
+        } else {
+            scoreboardInfo.textContent = 'No match selected';
+        }
+        
+        // Fetch next match for waiting info
+        fetch('/api/tournament/' + tournamentId + '/next-match')
+            .then(r => r.json())
+            .then(data => {
+                const waitingInfo = document.getElementById('waiting-info');
+                if (data.next_match) {
+                    const t1 = data.next_match.team1 ? data.next_match.team1.name : 'TBD';
+                    const t2 = data.next_match.team2 ? data.next_match.team2.name : 'TBD';
+                    waitingInfo.textContent = `Next: ${t1} vs ${t2}`;
+                    tournamentState.nextMatch = data.next_match;
+                } else {
+                    waitingInfo.textContent = 'No upcoming matches';
+                    tournamentState.nextMatch = null;
+                }
+                updateSmartSuggestion();
+            })
+            .catch(() => {
+                document.getElementById('waiting-info').textContent = 'Between matches';
+            });
+        
+        // Update bracket info with match progress
+        fetch('/api/tournament/' + tournamentId + '/stats')
+            .then(r => r.json())
+            .then(data => {
+                const bracketInfo = document.getElementById('bracket-info');
+                if (data.completed && data.total) {
+                    bracketInfo.textContent = `${data.completed}/${data.total} matches done`;
+                    tournamentState.completedMatches = data.completed;
+                    tournamentState.totalMatches = data.total;
+                }
+            })
+            .catch(() => {
+                document.getElementById('bracket-info').textContent = 'Full tournament view';
+            });
+    }
+    
+    function updateSmartSuggestion() {
+        const suggestionEl = document.getElementById('smart-suggestion');
+        const suggestionText = document.getElementById('suggestion-text');
+        
+        // Determine the best mode based on state
+        if (!currentMatchId) {
+            // No match selected
+            if (tournamentState.nextMatch) {
+                suggestedMode = 'waiting';
+                suggestionText.textContent = 'Show waiting screen with next match preview';
+                suggestionEl.style.display = 'flex';
+            } else {
+                suggestedMode = 'bracket';
+                suggestionText.textContent = 'Show bracket - no active match';
+                suggestionEl.style.display = 'flex';
+            }
+        } else if (currentMode === 'waiting' && currentMatchId) {
+            suggestedMode = 'scoreboard';
+            suggestionText.textContent = 'Match selected - switch to scoreboard?';
+            suggestionEl.style.display = 'flex';
+        } else if (currentMode === currentMode) {
+            // Already in a good state, hide suggestion
+            suggestionEl.style.display = 'none';
+            suggestedMode = null;
+        }
+        
+        updateModeButtons();
+    }
+    
+    function applySuggestion() {
+        if (suggestedMode) {
+            setMode(suggestedMode);
+            document.getElementById('smart-suggestion').style.display = 'none';
+            suggestedMode = null;
+        }
+    }
+    
+    function setMode(mode) {
+        if (connectedTVs.length === 0) {
+            alert('No TVs connected. Enter a TV code first.');
+            return;
+        }
+        
+        currentMode = mode;
+        updateModeButtons();
+        document.getElementById('current-mode-badge').textContent = getModeLabel(mode);
+        
+        // Hide suggestion when user picks a mode
+        document.getElementById('smart-suggestion').style.display = 'none';
+        suggestedMode = null;
+        
+        // Send to all connected TVs
+        sendToAllTVs({
+            mode: mode,
+            tournament_id: tournamentId
+        });
+        
+        // Also update global state for backward compatibility
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: mode,
+                tournament_id: tournamentId
+            })
+        });
+    }
+    
+    // Initialize mode info on load
+    setTimeout(updateModeInfo, 500);
+    
+    function sendMessage() {
+        if (connectedTVs.length === 0) {
+            alert('No TVs connected. Enter a TV code first.');
+            return;
+        }
+        
+        const message = document.getElementById('custom-message').value;
+        
+        // Send to all connected TVs
+        sendToAllTVs({
+            mode: 'message',
+            tournament_id: tournamentId,
+            custom_message: message
+        });
+        
+        // Also update global state
+        fetch('/api/display/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: 'message',
+                tournament_id: tournamentId,
+                custom_message: message
+            })
+        });
+    }
+    
+    function quickMessage(message) {
+        document.getElementById('custom-message').value = message;
+        setMode('message');
+        setTimeout(() => sendMessage(), 100);
+    }
+    
+    function updateTimer() {
+        const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
+        const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+        const timerDuration = minutes * 60 + seconds;
+        
+        fetch('/api/tournament/' + tournamentId + '/timer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timer_duration: timerDuration })
+        }).then(() => {
+            alert('Timer set to ' + minutes + ':' + (seconds < 10 ? '0' : '') + seconds);
+        });
+    }
+    
+    function refreshTV() {
+        if (connectedTVs.length === 0) {
+            alert('No TVs connected. Enter a TV code first.');
+            return;
+        }
+        // Send refresh to each connected TV
+        connectedTVs.forEach(code => {
+            socket.emit('refresh_tv', { tv_code: code });
+        });
+    }
+    
+    // Theme management
+    let currentTheme = 'dark-orange';
+    const themeNames = {
+        'dark-orange': 'Robot Orange',
+        'hacker': 'Ultra Hacker',
+        'midnight': 'Midnight Blue',
+        'sunset': 'Warm Sunset',
+        'princess': 'Pink Princess',
+        'minimal': 'Clean Minimal'
+    };
+    
+    function setTheme(themeId) {
+        currentTheme = themeId;
+        
+        // Update UI
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.theme === themeId) {
+                btn.classList.add('active');
+            }
+        });
+        document.getElementById('current-theme-badge').textContent = themeNames[themeId] || themeId;
+        
+        // Send to API
+        fetch('/api/display/theme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: themeId })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                console.log('Theme updated:', themeId);
+            } else {
+                console.error('Theme update failed:', data);
+                alert('Theme update failed: ' + (data.error || 'Unknown error'));
+            }
+        }).catch(err => {
+            console.error('Theme API error:', err);
+        });
+    }
+    
+    // Initialize theme on page load
+    function initTheme() {
+        fetch('/api/display/state')
+            .then(r => r.json())
+            .then(data => {
+                if (data.theme) {
+                    currentTheme = data.theme;
+                    document.querySelectorAll('.theme-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                        if (btn.dataset.theme === data.theme) {
+                            btn.classList.add('active');
+                        }
+                    });
+                    document.getElementById('current-theme-badge').textContent = themeNames[data.theme] || data.theme;
+                }
+            });
+    }
+    initTheme();
+</script>
+{% endblock %}

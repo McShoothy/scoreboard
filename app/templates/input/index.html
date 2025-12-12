@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+
+{% block title %}Score Input - RobotUprising{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tournament-card {
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tournament-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px var(--glow-color, rgba(255, 107, 0, 0.3));
+    }
+    .tv-pair-section {
+        background: var(--ru-secondary);
+        border: 1px solid var(--ru-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+    }
+    .tv-session-item {
+        background: var(--ru-dark);
+        border: 1px solid var(--ru-border);
+        border-radius: 8px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    .tv-session-item.active {
+        border-color: var(--ru-primary);
+        background: rgba(255, 107, 0, 0.1);
+    }
+    .tv-code {
+        font-family: monospace;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--ru-primary);
+        letter-spacing: 2px;
+    }
+    .pair-input {
+        max-width: 200px;
+        font-family: monospace;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        text-align: center;
+        font-size: 1.2rem;
+    }
+    /* QR Scanner styles */
+    .qr-scanner-btn {
+        background: var(--ru-dark);
+        border: 1px solid var(--ru-border);
+        color: var(--ru-primary);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .qr-scanner-btn:hover {
+        background: var(--ru-primary);
+        color: white;
+    }
+    #qr-reader {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    #qr-reader video {
+        border-radius: 12px;
+    }
+    .scanner-modal .modal-content {
+        background: var(--ru-secondary);
+        border: 1px solid var(--ru-border);
+    }
+    .scanner-modal .modal-header {
+        border-bottom: 1px solid var(--ru-border);
+    }
+    .scanner-success {
+        animation: pulse-success 0.5s ease;
+    }
+    @keyframes pulse-success {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <h1><i class="bi bi-tablet me-2"></i>Score Input</h1>
+    <p class="text-muted">Select a tournament to enter scores</p>
+</div>
+
+<!-- TV Pairing Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="tv-pair-section">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-2"><i class="bi bi-tv me-2"></i>TV Pairing</h5>
+                    {% if control_all %}
+                        <p class="text-success mb-0">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            <strong>Controlling ALL Screens</strong> ({{ tv_codes|length }} TVs)
+                            <a href="#" onclick="unpairTV(); return false;" class="ms-2 text-danger">
+                                <i class="bi bi-x-circle"></i> Release All
+                            </a>
+                        </p>
+                    {% elif tv_codes and tv_codes|length > 0 %}
+                        <p class="text-success mb-0">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Connected to {{ tv_codes|length }} TV(s): 
+                            {% for code in tv_codes %}
+                                <span class="tv-code">{{ code }}</span>{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            <a href="#" onclick="unpairTV(); return false;" class="ms-2 text-danger">
+                                <i class="bi bi-x-circle"></i> Disconnect
+                            </a>
+                        </p>
+                    {% else %}
+                        <p class="text-muted mb-0">Pair with TVs to control their display</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2 justify-content-md-end mt-2 mt-md-0 flex-wrap">
+                        {% if tv_sessions and tv_sessions|length > 0 %}
+                        <button type="button" class="btn btn-success" onclick="pairAllTVs()">
+                            <i class="bi bi-collection me-1"></i>All Screens ({{ tv_sessions|length }})
+                        </button>
+                        {% endif %}
+                        <button type="button" class="qr-scanner-btn" onclick="openQRScanner()">
+                            <i class="bi bi-qr-code-scan me-1"></i>Scan QR
+                        </button>
+                        <form onsubmit="pairTV(); return false;" class="d-flex gap-2">
+                            <input type="text" id="pair-code" class="form-control pair-input" placeholder="ABCDEF" maxlength="6">
+                            <button type="submit" class="btn btn-ru">
+                                <i class="bi bi-link-45deg me-1"></i>Pair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            {% if tv_sessions %}
+            <div class="mt-3">
+                <small class="text-muted">Active TVs:</small>
+                <div class="mt-2">
+                    {% for tv in tv_sessions %}
+                    <div class="tv-session-item {% if tv.code in tv_codes %}active{% endif %}">
+                        <div>
+                            <span class="tv-code">{{ tv.code }}</span>
+                            {% if tv.tournament_name %}
+                                <span class="badge bg-info ms-2">{{ tv.tournament_name }}</span>
+                            {% endif %}
+                        </div>
+                        {% if tv.code in tv_codes %}
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Connected</span>
+                        {% else %}
+                        <button class="btn btn-sm btn-outline-primary" onclick="pairToTV('{{ tv.code }}')">
+                            <i class="bi bi-link"></i> Connect
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 justify-content-center">
+    {% if tournaments %}
+        {% for tournament in tournaments %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card tournament-card h-100 text-center p-4">
+                <div class="card-body">
+                    <i class="bi bi-trophy display-3 text-warning mb-3"></i>
+                    <h3>{{ tournament.name }}</h3>
+                    <span class="badge bg-success mb-3">Active</span>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('input.input_ipad', tournament_id=tournament.id) }}" class="btn btn-ru btn-lg">
+                            <i class="bi bi-tablet me-2"></i>iPad Control
+                        </a>
+                        <a href="{{ url_for('input.input_tournament', tournament_id=tournament.id) }}" class="btn btn-outline-light btn-sm">
+                            <i class="bi bi-list-ul me-1"></i>Match List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-md-6">
+            <div class="card text-center p-5">
+                <div class="card-body">
+                    <i class="bi bi-exclamation-circle display-1 text-warning mb-3"></i>
+                    <h3>No Active Tournaments</h3>
+                    <p class="text-muted">Create a tournament in the admin panel first.</p>
+                    <a href="{{ url_for('admin.manage_tournaments') }}" class="btn btn-ru">Go to Admin</a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- QR Scanner Modal -->
+<div class="modal fade scanner-modal" id="qrScannerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Scan TV QR Code</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="scanner-container">
+                    <video id="qr-video" playsinline style="width: 100%; max-width: 400px; border-radius: 12px; display: none;"></video>
+                    <canvas id="qr-canvas" style="display: none;"></canvas>
+                    <div id="scanner-status" class="my-3">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Starting camera...</p>
+                    </div>
+                </div>
+                <div id="scanner-fallback" style="display: none;" class="p-3">
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Camera requires HTTPS on non-localhost
+                    </div>
+                    <label class="btn btn-ru btn-lg w-100 mb-3">
+                        <i class="bi bi-camera me-2"></i>Take Photo of QR Code
+                        <input type="file" id="qr-file-input" accept="image/*" capture="environment" style="display: none;" onchange="scanFromFile(this)">
+                    </label>
+                    <p class="text-muted small">Or enter the 6-character code shown on the TV manually</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+    let videoStream = null;
+    let scannerInterval = null;
+    
+    function openQRScanner() {
+        const modal = new bootstrap.Modal(document.getElementById('qrScannerModal'));
+        modal.show();
+        
+        document.getElementById('qrScannerModal').addEventListener('shown.bs.modal', startCamera, { once: true });
+        document.getElementById('qrScannerModal').addEventListener('hidden.bs.modal', stopCamera, { once: true });
+    }
+    
+    async function startCamera() {
+        const video = document.getElementById('qr-video');
+        const status = document.getElementById('scanner-status');
+        const fallback = document.getElementById('scanner-fallback');
+        
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+            });
+            
+            video.srcObject = videoStream;
+            video.style.display = 'block';
+            status.style.display = 'none';
+            
+            video.onloadedmetadata = () => {
+                video.play();
+                startScanning();
+            };
+        } catch (err) {
+            console.error('Camera error:', err);
+            status.style.display = 'none';
+            fallback.style.display = 'block';
+        }
+    }
+    
+    function startScanning() {
+        const video = document.getElementById('qr-video');
+        const canvas = document.getElementById('qr-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        scannerInterval = setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert'
+                });
+                
+                if (code) {
+                    console.log('QR Found:', code.data);
+                    handleQRCode(code.data);
+                }
+            }
+        }, 100); // Scan every 100ms
+    }
+    
+    function stopCamera() {
+        if (scannerInterval) {
+            clearInterval(scannerInterval);
+            scannerInterval = null;
+        }
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+        // Reset UI for next open
+        document.getElementById('qr-video').style.display = 'none';
+        document.getElementById('scanner-status').style.display = 'block';
+        document.getElementById('scanner-fallback').style.display = 'none';
+    }
+    
+    function scanFromFile(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const img = new Image();
+            const canvas = document.getElementById('qr-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'attemptBoth'
+                });
+                
+                if (code) {
+                    handleQRCode(code.data);
+                } else {
+                    alert('Could not read QR code from image. Please try again.');
+                }
+            };
+            
+            img.src = URL.createObjectURL(file);
+        }
+    }
+    
+    function handleQRCode(decodedText) {
+        stopCamera();
+        
+        // Extract the TV code from the URL or use as-is
+        let tvCode = decodedText;
+        
+        // Check if it's a URL (contains /auth/pair/)
+        const pairMatch = decodedText.match(/\/auth\/pair\/([A-Za-z0-9]{6})/i);
+        if (pairMatch) {
+            tvCode = pairMatch[1].toUpperCase();
+        } else if (decodedText.length === 6 && /^[A-Za-z0-9]+$/.test(decodedText)) {
+            tvCode = decodedText.toUpperCase();
+        } else {
+            alert('Invalid QR code. Expected TV pairing code.');
+            return;
+        }
+        
+        // Close modal and pair
+        bootstrap.Modal.getInstance(document.getElementById('qrScannerModal')).hide();
+        pairToTV(tvCode);
+    }
+
+    function pairTV() {
+        const code = document.getElementById('pair-code').value.toUpperCase();
+        if (code.length !== 6) {
+            alert('Please enter a 6-character code');
+            return;
+        }
+        
+        fetch('/api/tv/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Invalid TV code');
+            }
+        });
+    }
+    
+    function pairToTV(code) {
+        fetch('/api/tv/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to connect to TV');
+            }
+        });
+    }
+    
+    function pairAllTVs() {
+        fetch('/api/tv/pair-all', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('No active TVs found');
+            }
+        });
+    }
+    
+    function unpairTV() {
+        fetch('/api/tv/unpair', { method: 'POST' })
+            .then(() => location.reload());
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}TV Display - RobotUprising{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #14141f;
+        background-image: 
+            linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+        overflow: hidden;
+    }
+    
+    .display-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem;
+    }
+    
+    .pairing-card {
+        background: rgba(37, 37, 56, 0.95);
+        border: 2px solid var(--ru-primary);
+        border-radius: 20px;
+        padding: 3rem;
+        text-align: center;
+        max-width: 500px;
+        box-shadow: 0 0 60px rgba(255, 107, 0, 0.2);
+    }
+    
+    .tv-code {
+        font-family: 'Courier New', monospace;
+        font-size: 4rem;
+        font-weight: bold;
+        letter-spacing: 0.5rem;
+        color: var(--ru-primary);
+        text-shadow: 0 0 20px rgba(255, 107, 0, 0.5);
+        margin: 1.5rem 0;
+    }
+    
+    .qr-container {
+        background: #14141f;
+        padding: 1rem;
+        border-radius: 12px;
+        display: inline-block;
+        margin: 1.5rem 0;
+    }
+    
+    .qr-container img {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .instruction {
+        color: var(--ru-muted);
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .instruction-main {
+        color: var(--ru-text);
+        font-size: 1.3rem;
+        font-weight: 600;
+    }
+    
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+        padding: 0.75rem 1.5rem;
+        background: rgba(255, 212, 59, 0.1);
+        border-radius: 30px;
+        color: #ffd43b;
+    }
+    
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        background: #ffd43b;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    
+    .logo-small {
+        margin-bottom: 2rem;
+    }
+    
+    /* Connected state */
+    .pairing-card.connected {
+        border-color: #28a745;
+        box-shadow: 0 0 60px rgba(40, 167, 69, 0.2);
+    }
+    
+    .pairing-card.connected .status-indicator {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .pairing-card.connected .status-dot {
+        background: #28a745;
+        animation: none;
+    }
+    
+    /* Tournament selector */
+    .tournament-selector {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--ru-border);
+        display: none;
+    }
+    
+    .tournament-selector.visible {
+        display: block;
+    }
+    
+    .tournament-btn {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background: var(--ru-dark);
+        border: 1px solid var(--ru-border);
+        border-radius: 10px;
+        color: var(--ru-text);
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    
+    .tournament-btn:hover {
+        background: var(--ru-primary);
+        border-color: var(--ru-primary);
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .tournament-btn i {
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="display-container">
+    <div class="pairing-card" id="pairing-card">
+        <div class="logo-small">
+            <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="80">
+        </div>
+        
+        <div class="instruction">Scan QR code to control this display</div>
+        
+        <div class="tv-code" id="tv-code">{{ tv_session.code }}</div>
+        
+        <div class="qr-container">
+            <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code for {{ tv_session.code }}">
+        </div>
+        
+        <div class="instruction-main">
+            <i class="bi bi-qr-code-scan me-2"></i>Scan to pair &amp; control
+        </div>
+        
+        <div class="status-indicator" id="status-indicator">
+            <div class="status-dot"></div>
+            <span id="status-text">Waiting for controller...</span>
+        </div>
+        
+        <!-- Tournament selector (shown when connected or for admins) -->
+        <div class="tournament-selector" id="tournament-selector">
+            <div class="instruction mb-3">Select tournament to display:</div>
+            {% if tournaments %}
+                {% for tournament in tournaments %}
+                <a href="{{ url_for('display.display_live', tournament_id=tournament.id) }}" class="tournament-btn">
+                    <i class="bi bi-trophy"></i>{{ tournament.name }}
+                </a>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No active tournaments available</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const socket = io();
+    const tvCode = '{{ tv_session.code }}';
+    let isConnected = false;
+    
+    // Request fullscreen
+    function goFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log('Fullscreen request failed:', err));
+        } else if (elem.webkitRequestFullscreen) { /* Safari */
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) { /* IE11 */
+            elem.msRequestFullscreen();
+        }
+    }
+    
+    // Join the TV room
+    socket.on('connect', function() {
+        socket.emit('join_tv', { code: tvCode });
+    });
+    
+    // Listen for controller connection
+    socket.on('controller_connected', function(data) {
+        if (data.code === tvCode) {
+            isConnected = true;
+            document.getElementById('pairing-card').classList.add('connected');
+            document.getElementById('status-text').textContent = 'Controller connected!';
+            document.getElementById('tournament-selector').classList.add('visible');
+            // Auto fullscreen when connected
+            goFullscreen();
+        }
+    });
+    
+    // Listen for controller disconnect
+    socket.on('controller_disconnected', function(data) {
+        if (data.code === tvCode) {
+            isConnected = false;
+            document.getElementById('pairing-card').classList.remove('connected');
+            document.getElementById('status-text').textContent = 'Waiting for controller...';
+        }
+    });
+    
+    // Listen for TV control (redirect to live display)
+    socket.on('tv_control', function(data) {
+        if (data.code === tvCode && data.tournament_id) {
+            goFullscreen();
+            window.location.href = '/display/live/' + data.tournament_id;
+        }
+    });
+    
+    // Listen for explicit redirect to live command
+    socket.on('redirect_to_live', function(data) {
+        if (data.code === tvCode && data.url) {
+            console.log('Redirecting to live display:', data.url);
+            goFullscreen();
+            window.location.href = data.url;
+        }
+    });
+    
+    // Listen for direct navigation command
+    socket.on('navigate', function(data) {
+        if (data.url) {
+            window.location.href = data.url;
+        }
+    });
+    
+    // Listen for fullscreen command from controller
+    socket.on('fullscreen', function(data) {
+        if (!data.code || data.code === tvCode) {
+            goFullscreen();
+        }
+    });
+    
+    // Show tournament selector if user is admin (has session)
+    {% if session.admin_id %}
+    document.getElementById('tournament-selector').classList.add('visible');
+    {% endif %}
+</script>
+{% endblock %}

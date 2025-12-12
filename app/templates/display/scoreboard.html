@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Live Scoreboard - {{ tournament.name }}{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #14141f;
+        background-image: 
+            linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+        overflow: hidden;
+    }
+    .scoreboard-container {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 2rem;
+    }
+    .tournament-title {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .tournament-title h1 {
+        font-size: 3rem;
+        text-transform: uppercase;
+        letter-spacing: 5px;
+        color: var(--ru-primary);
+    }
+    .match-display {
+        background: #1c1c2a;
+        border: 2px solid #3a3a50;
+        border-radius: 12px;
+        padding: 3rem;
+    }
+    .vs-badge {
+        font-size: 3rem;
+        color: var(--ru-primary);
+        font-weight: bold;
+    }
+    .team-section {
+        text-align: center;
+    }
+    .team-name {
+        font-size: 3.5rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+    .team-players {
+        font-size: 1.5rem;
+        color: #9a9ab0;
+        margin-bottom: 2rem;
+    }
+    .score-display {
+        font-size: 12rem;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .team-1 .team-name, .team-1 .score-display {
+        color: #4dabf7;
+    }
+    .team-2 .team-name, .team-2 .score-display {
+        color: #ff6b6b;
+    }
+    .live-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #dc3545;
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 4px;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    .waiting-screen {
+        text-align: center;
+    }
+    .waiting-screen i {
+        font-size: 8rem;
+        color: var(--ru-primary);
+    }
+    .bracket-link {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scoreboard-container">
+    <div class="live-badge">
+        <i class="bi bi-broadcast me-2"></i>LIVE
+    </div>
+    
+    <div class="tournament-title">
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="80" class="mb-3">
+        <h1>{{ tournament.name }}</h1>
+    </div>
+    
+    {% if current_match and current_match.team1 and current_match.team2 %}
+    <div class="match-display">
+        <div class="row align-items-center">
+            <!-- Team 1 -->
+            <div class="col-5 team-section team-1">
+                <div class="team-name">{{ current_match.team1.name }}</div>
+                <div class="team-players">{{ current_match.team1.player1 }} & {{ current_match.team1.player2 }}</div>
+                <div class="score-display" id="team1-score">{{ current_match.team1_score }}</div>
+            </div>
+            
+            <!-- VS -->
+            <div class="col-2 text-center">
+                <div class="vs-badge">VS</div>
+            </div>
+            
+            <!-- Team 2 -->
+            <div class="col-5 team-section team-2">
+                <div class="team-name">{{ current_match.team2.name }}</div>
+                <div class="team-players">{{ current_match.team2.player1 }} & {{ current_match.team2.player2 }}</div>
+                <div class="score-display" id="team2-score">{{ current_match.team2_score }}</div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="waiting-screen">
+        <i class="bi bi-hourglass-split mb-4"></i>
+        <h2 class="display-4">Waiting for Next Match</h2>
+        <p class="lead text-muted">The next match will appear here automatically</p>
+    </div>
+    {% endif %}
+    
+    <a href="{{ url_for('display.display_tournament', tournament_id=tournament.id) }}" class="bracket-link btn btn-outline-light btn-lg">
+        <i class="bi bi-diagram-3 me-2"></i>View Full Bracket
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const socket = io();
+    const tournamentId = {{ tournament.id }};
+    {% if current_match %}
+    const matchId = {{ current_match.id }};
+    {% else %}
+    const matchId = null;
+    {% endif %}
+    
+    socket.on('connect', function() {
+        socket.emit('join_tournament', { tournament_id: tournamentId });
+        console.log('Connected to tournament room');
+    });
+    
+    socket.on('score_update', function(data) {
+        if (matchId && data.match_id === matchId) {
+            document.getElementById('team1-score').textContent = data.team1_score;
+            document.getElementById('team2-score').textContent = data.team2_score;
+            
+            // Add visual feedback
+            document.getElementById('team1-score').style.animation = 'none';
+            document.getElementById('team2-score').style.animation = 'none';
+            setTimeout(() => {
+                document.getElementById('team1-score').style.animation = '';
+                document.getElementById('team2-score').style.animation = '';
+            }, 10);
+        }
+    });
+    
+    socket.on('match_complete', function(data) {
+        // Reload to show next match
+        setTimeout(() => location.reload(), 2000);
+    });
+    
+    socket.on('current_match_changed', function(data) {
+        location.reload();
+    });
+    
+    // Auto-refresh every 60 seconds as backup
+    setInterval(function() {
+        location.reload();
+    }, 60000);
+</script>
+{% endblock %}

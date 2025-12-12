@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tournament.name }} - Score Input{% endblock %}
+
+{% block extra_css %}
+<style>
+    .match-button {
+        min-height: 100px;
+        font-size: 1.2rem;
+    }
+    .current-match {
+        border: 3px solid var(--ru-primary) !important;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); }
+        50% { box-shadow: 0 0 0 15px rgba(255, 107, 0, 0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-trophy me-2"></i>{{ tournament.name }}</h1>
+    <div>
+        <a href="{{ url_for('input.input_remote', tournament_id=tournament.id) }}" class="btn btn-warning me-2">
+            <i class="bi bi-tv me-1"></i>TV Remote
+        </a>
+        <a href="{{ url_for('input.input_index') }}" class="btn btn-outline-light">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+</div>
+
+{% if current_match %}
+<div class="card current-match mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h4 class="mb-0"><i class="bi bi-broadcast me-2"></i>Current Match</h4>
+    </div>
+    <div class="card-body text-center">
+        <a href="{{ url_for('input.input_match', match_id=current_match.id) }}" class="btn btn-ru btn-lg w-100 py-4">
+            <div class="display-6">
+                {{ current_match.team1.name if current_match.team1 else 'TBD' }}
+                <span class="mx-3">vs</span>
+                {{ current_match.team2.name if current_match.team2 else 'TBD' }}
+            </div>
+            <div class="mt-2">
+                <span class="badge bg-dark fs-4">{{ current_match.team1_score }} - {{ current_match.team2_score }}</span>
+            </div>
+            <div class="mt-2">
+                <i class="bi bi-hand-index-thumb me-1"></i>Tap to Enter Scores
+            </div>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">All Matches</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for match in matches %}
+            <div class="col-md-6 col-lg-4">
+                <a href="{{ url_for('input.input_match', match_id=match.id) }}" class="text-decoration-none">
+                    <div class="card match-button {% if match.is_current %}border-warning{% endif %}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">Round {{ match.round_number }}, Match {{ match.match_number }}</small>
+                                {% if match.is_current %}
+                                <span class="badge bg-warning text-dark">LIVE</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>{{ match.team1.name if match.team1 else 'TBD' }}</span>
+                                <strong class="fs-4">{{ match.team1_score }}</strong>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>{{ match.team2.name if match.team2 else 'TBD' }}</span>
+                                <strong class="fs-4">{{ match.team2_score }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

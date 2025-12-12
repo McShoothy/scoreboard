@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Match Input - RobotUprising{% endblock %}
+
+{% block extra_css %}
+<style>
+    .score-btn {
+        width: 80px;
+        height: 80px;
+        font-size: 2rem;
+        border-radius: 50%;
+    }
+    .score-display {
+        font-size: 6rem;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .team-panel {
+        min-height: 350px;
+    }
+    .winner-btn {
+        font-size: 1.5rem;
+        padding: 1rem 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-controller me-2"></i>Round {{ match.round_number }}, Match {{ match.match_number }}</h4>
+    <a href="{{ url_for('input.input_tournament', tournament_id=match.tournament_id) }}" class="btn btn-outline-light">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Team 1 -->
+    <div class="col-md-6">
+        <div class="card team-panel text-center">
+            <div class="card-header bg-primary">
+                <h3 class="mb-0">{{ match.team1.name if match.team1 else 'TBD' }}</h3>
+                {% if match.team1 %}
+                <small>{{ match.team1.player1 }} & {{ match.team1.player2 }}</small>
+                {% endif %}
+            </div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="score-display text-primary mb-4" id="team1-score">{{ match.team1_score }}</div>
+                <div class="d-flex justify-content-center gap-3">
+                    <button class="btn btn-outline-danger score-btn" onclick="updateScore(1, -1)">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button class="btn btn-success score-btn" onclick="updateScore(1, 1)">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Team 2 -->
+    <div class="col-md-6">
+        <div class="card team-panel text-center">
+            <div class="card-header bg-danger">
+                <h3 class="mb-0">{{ match.team2.name if match.team2 else 'TBD' }}</h3>
+                {% if match.team2 %}
+                <small>{{ match.team2.player1 }} & {{ match.team2.player2 }}</small>
+                {% endif %}
+            </div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="score-display text-danger mb-4" id="team2-score">{{ match.team2_score }}</div>
+                <div class="d-flex justify-content-center gap-3">
+                    <button class="btn btn-outline-danger score-btn" onclick="updateScore(2, -1)">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button class="btn btn-success score-btn" onclick="updateScore(2, 1)">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Match Section -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-flag-fill me-2"></i>Complete Match</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-center mb-4">Select the winner to complete this match and advance them:</p>
+        <div class="row g-3">
+            {% if match.team1 %}
+            <div class="col-md-6">
+                <button class="btn btn-outline-primary winner-btn w-100" onclick="completeMatch({{ match.team1.id }})">
+                    <i class="bi bi-trophy me-2"></i>{{ match.team1.name }} Wins!
+                </button>
+            </div>
+            {% endif %}
+            {% if match.team2 %}
+            <div class="col-md-6">
+                <button class="btn btn-outline-danger winner-btn w-100" onclick="completeMatch({{ match.team2.id }})">
+                    <i class="bi bi-trophy me-2"></i>{{ match.team2.name }} Wins!
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Set as Current Match -->
+<div class="text-center mt-4">
+    <button class="btn btn-warning btn-lg" onclick="setAsCurrent()">
+        <i class="bi bi-broadcast me-2"></i>Set as Current Match
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const matchId = {{ match.id }};
+    const socket = io();
+    
+    let team1Score = {{ match.team1_score }};
+    let team2Score = {{ match.team2_score }};
+    
+    function updateScore(team, delta) {
+        if (team === 1) {
+            team1Score = Math.max(0, team1Score + delta);
+            document.getElementById('team1-score').textContent = team1Score;
+        } else {
+            team2Score = Math.max(0, team2Score + delta);
+            document.getElementById('team2-score').textContent = team2Score;
+        }
+        
+        // Send update to server
+        fetch(`/api/match/${matchId}/score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                team1_score: team1Score,
+                team2_score: team2Score
+            })
+        });
+    }
+    
+    function completeMatch(winnerId) {
+        if (confirm('Complete this match and advance the winner?')) {
+            fetch(`/api/match/${matchId}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ winner_id: winnerId })
+            }).then(() => {
+                window.location.href = '{{ url_for("input.input_tournament", tournament_id=match.tournament_id) }}';
+            });
+        }
+    }
+    
+    function setAsCurrent() {
+        fetch(`/api/match/${matchId}/set-current`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(() => {
+            alert('This match is now the current match!');
+        });
+    }
+    
+    // Listen for score updates from other sources
+    socket.on('score_update', function(data) {
+        if (data.match_id === matchId) {
+            team1Score = data.team1_score;
+            team2Score = data.team2_score;
+            document.getElementById('team1-score').textContent = team1Score;
+            document.getElementById('team2-score').textContent = team2Score;
+        }
+    });
+</script>
+{% endblock %}
