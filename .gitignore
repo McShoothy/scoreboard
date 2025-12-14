@@ -45,3 +45,6 @@ ngrok.yml
 .pytest_cache/
 .coverage
 htmlcov/
+
+# AI Agent Documentation
+.agent/

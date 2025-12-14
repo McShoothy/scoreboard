@@ -18,6 +18,7 @@
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <div class="mb-3">
                         <label class="form-label">Team Name</label>
                         <input type="text" name="name" class="form-control" required>
@@ -37,7 +38,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
@@ -64,9 +65,9 @@
                                 <td>{{ team.player1 }}</td>
                                 <td>{{ team.player2 }}</td>
                                 <td>
-                                    <form method="POST" action="{{ url_for('admin.delete_team', team_id=team.id) }}" 
-                                          style="display: inline;" 
-                                          onsubmit="return confirm('Delete this team?')">
+                                    <form method="POST" action="{{ url_for('admin.delete_team', team_id=team.id) }}"
+                                        style="display: inline;" onsubmit="return confirm('Delete this team?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-trash"></i>
                                         </button>

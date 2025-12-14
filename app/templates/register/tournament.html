@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Register for {{ tournament.name }} - RobotUprising{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #14141f;
+        background-image:
+            linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+    }
+
+    .register-container {
+        padding: 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .tournament-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: rgba(37, 37, 56, 0.95);
+        border: 2px solid var(--ru-primary);
+        border-radius: 20px;
+    }
+
+    .tournament-name {
+        color: var(--ru-primary);
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        margin-bottom: 0.5rem;
+    }
+
+    .tournament-info {
+        color: var(--ru-muted);
+        font-size: 1.1rem;
+    }
+
+    .spots-badge {
+        display: inline-block;
+        background: var(--ru-primary);
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 1rem;
+    }
+
+    .spots-badge.full {
+        background: #dc3545;
+    }
+
+    .registration-closed {
+        background: #dc3545;
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+    }
+
+    .register-form {
+        background: rgba(37, 37, 56, 0.95);
+        border: 1px solid var(--ru-border);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .form-label {
+        color: var(--ru-text);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.9rem;
+    }
+
+    .form-control {
+        background: #14141f;
+        border: 2px solid var(--ru-border);
+        color: var(--ru-text);
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+        border-radius: 10px;
+    }
+
+    .form-control:focus {
+        background: #1a1a2e;
+        border-color: var(--ru-primary);
+        color: var(--ru-text);
+        box-shadow: 0 0 10px rgba(255, 107, 0, 0.2);
+    }
+
+    .form-control::placeholder {
+        color: #555;
+    }
+
+    .btn-submit {
+        background: var(--ru-primary);
+        border: none;
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+        padding: 1rem 3rem;
+        border-radius: 50px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.3s;
+        width: 100%;
+    }
+
+    .btn-submit:hover {
+        background: #e05a00;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(255, 107, 0, 0.4);
+    }
+
+    .btn-submit:disabled {
+        background: #555;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .teams-list {
+        background: rgba(37, 37, 56, 0.95);
+        border: 1px solid var(--ru-border);
+        border-radius: 20px;
+        padding: 2rem;
+    }
+
+    .teams-list h3 {
+        color: var(--ru-primary);
+        margin-bottom: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .team-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background: #1a1a2e;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+    }
+
+    .team-number {
+        background: var(--ru-primary);
+        color: white;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+
+    .team-info {
+        flex-grow: 1;
+    }
+
+    .team-name {
+        font-weight: bold;
+        color: var(--ru-text);
+        font-size: 1.1rem;
+    }
+
+    .team-players {
+        color: var(--ru-muted);
+        font-size: 0.9rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--ru-muted);
+    }
+
+    .char-count {
+        font-size: 0.8rem;
+        color: var(--ru-muted);
+        text-align: right;
+    }
+
+    .char-count.warning {
+        color: #ffc107;
+    }
+
+    .char-count.danger {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <div class="tournament-header">
+        <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="60" class="mb-3">
+        <h1 class="tournament-name">{{ tournament.name }}</h1>
+        {% if tournament.description %}
+        <p class="tournament-info">{{ tournament.description }}</p>
+        {% endif %}
+        {% if tournament.event_date %}
+        <p class="tournament-info"><i class="bi bi-calendar me-2"></i>{{ tournament.event_date.strftime('%B %d, %Y') }}
+        </p>
+        {% endif %}
+        {% if tournament.location %}
+        <p class="tournament-info"><i class="bi bi-geo-alt me-2"></i>{{ tournament.location }}</p>
+        {% endif %}
+
+        {% set spots_remaining = tournament.max_teams - tournament.get_registered_team_count() %}
+        <div class="spots-badge {{ 'full' if spots_remaining <= 0 else '' }}">
+            {% if spots_remaining > 0 %}
+            <i class="bi bi-people me-2"></i>{{ spots_remaining }} spots remaining
+            {% else %}
+            <i class="bi bi-x-circle me-2"></i>Tournament Full
+            {% endif %}
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show"
+        role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% if can_register %}
+    <div class="register-form">
+        <h3 class="text-center mb-4" style="color: var(--ru-primary);">
+            <i class="bi bi-pencil-square me-2"></i>Register Your Team
+        </h3>
+
+        <form action="{{ url_for('register.register_team') }}" method="POST" id="registration-form">
+            <input type="hidden" name="tournament_code" value="{{ tournament.registration_code }}">
+
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <label class="form-label">Team Name <span class="text-danger">*</span></label>
+                    <input type="text" name="team_name" class="form-control" placeholder="Enter team name"
+                        maxlength="20" required oninput="updateCharCount(this, 20)">
+                    <div class="char-count" id="team_name-count">0/20</div>
+                </div>
+
+                {% if tournament.require_player_names %}
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Player 1 Name <span class="text-danger">*</span></label>
+                    <input type="text" name="player1" class="form-control" placeholder="First player" maxlength="30"
+                        required oninput="updateCharCount(this, 30)">
+                    <div class="char-count" id="player1-count">0/30</div>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Player 2 Name <span class="text-danger">*</span></label>
+                    <input type="text" name="player2" class="form-control" placeholder="Second player" maxlength="30"
+                        required oninput="updateCharCount(this, 30)">
+                    <div class="char-count" id="player2-count">0/30</div>
+                </div>
+                {% endif %}
+
+                {% if tournament.require_email %}
+                <div class="col-12 mb-3">
+                    <label class="form-label">Email <span class="text-danger">*</span></label>
+                    <input type="email" name="email" class="form-control" placeholder="contact@example.com" required>
+                </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-submit mt-3">
+                <i class="bi bi-check-circle me-2"></i>Register Team
+            </button>
+
+            {% if tournament.require_confirmation %}
+            <p class="text-center text-muted mt-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Registration requires admin confirmation
+            </p>
+            {% endif %}
+        </form>
+    </div>
+    {% else %}
+    <div class="register-form">
+        <div class="registration-closed text-center">
+            <i class="bi bi-lock me-2"></i>{{ register_message }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="teams-list">
+        <h3><i class="bi bi-people-fill me-2"></i>Registered Teams ({{ teams|length }}/{{ tournament.max_teams }})</h3>
+
+        {% if teams %}
+        {% for team in teams %}
+        <div class="team-item">
+            <div class="team-number">{{ loop.index }}</div>
+            <div class="team-info">
+                <div class="team-name">{{ team.name }}</div>
+                <div class="team-players">{{ team.player1 }} & {{ team.player2 }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p class="mt-2">No teams registered yet. Be the first!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('register.register_index') }}" class="text-muted">
+            <i class="bi bi-arrow-left me-1"></i>Enter Different Code
+        </a>
+    </div>
+</div>
+
+<script>
+    function updateCharCount(input, max) {
+        const count = input.value.length;
+        const countEl = document.getElementById(input.name + '-count');
+        if (countEl) {
+            countEl.textContent = count + '/' + max;
+            countEl.className = 'char-count';
+            if (count >= max) {
+                countEl.classList.add('danger');
+            } else if (count >= max * 0.8) {
+                countEl.classList.add('warning');
+            }
+        }
+    }
+</script>
+{% endblock %}

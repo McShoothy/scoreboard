@@ -33,8 +33,10 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Standings</h5>
                 {% if tournament.format == 'round_robin_playoffs' and tournament.current_phase == 'group' %}
-                <form method="POST" action="{{ url_for('admin.advance_to_playoffs', tournament_id=tournament.id) }}" style="display: inline;">
-                    <button type="submit" class="btn btn-warning" onclick="return confirm('Advance top 4 teams to playoffs?')">
+                <form method="POST" action="{{ url_for('admin.advance_to_playoffs', tournament_id=tournament.id) }}"
+                    style="display: inline;">
+                    <button type="submit" class="btn btn-warning"
+                        onclick="return confirm('Advance top 4 teams to playoffs?')">
                         <i class="bi bi-arrow-right-circle me-1"></i>Advance Top 4 to Playoffs
                     </button>
                 </form>
@@ -56,19 +58,21 @@
                         </thead>
                         <tbody>
                             {% for entry in standings %}
-                            <tr class="{% if entry.rank <= 4 and tournament.format == 'round_robin_playoffs' %}table-success{% endif %}">
+                            <tr
+                                class="{% if entry.rank <= 4 and tournament.format == 'round_robin_playoffs' %}table-success{% endif %}">
                                 <td><strong>{{ entry.rank }}</strong></td>
                                 <td>
                                     {{ entry.team.name }}
-                                    {% if entry.rank <= 4 and tournament.format == 'round_robin_playoffs' %}
-                                    <span class="badge bg-success ms-1">Playoff</span>
-                                    {% endif %}
+                                    {% if entry.rank <= 4 and tournament.format=='round_robin_playoffs' %} <span
+                                        class="badge bg-success ms-1">Playoff</span>
+                                        {% endif %}
                                 </td>
                                 <td class="text-center">{{ entry.wins }}</td>
                                 <td class="text-center">{{ entry.losses }}</td>
                                 <td class="text-center">{{ entry.points_for }}</td>
                                 <td class="text-center">{{ entry.points_against }}</td>
-                                <td class="text-center {% if entry.point_diff > 0 %}text-success{% elif entry.point_diff < 0 %}text-danger{% endif %}">
+                                <td
+                                    class="text-center {% if entry.point_diff > 0 %}text-success{% elif entry.point_diff < 0 %}text-danger{% endif %}">
                                     {% if entry.point_diff > 0 %}+{% endif %}{{ entry.point_diff }}
                                 </td>
                             </tr>
@@ -94,10 +98,12 @@
                     {% endif %}
                 </h5>
                 <div>
-                    <a href="{{ url_for('display.display_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-outline-light" target="_blank">
+                    <a href="{{ url_for('display.display_tournament', tournament_id=tournament.id) }}"
+                        class="btn btn-sm btn-outline-light" target="_blank">
                         <i class="bi bi-tv me-1"></i>TV Display
                     </a>
-                    <a href="{{ url_for('input.input_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-ru" target="_blank">
+                    <a href="{{ url_for('input.input_tournament', tournament_id=tournament.id) }}"
+                        class="btn btn-sm btn-ru" target="_blank">
                         <i class="bi bi-tablet me-1"></i>iPad Input
                     </a>
                 </div>
@@ -110,47 +116,156 @@
                         <div class="round-column" style="min-width: 250px;">
                             <h6 class="text-center text-warning mb-3">
                                 {% if round_num >= 200 %}
-                                    Grand Finals
+                                Grand Finals
                                 {% elif round_num >= 101 %}
-                                    Finals
+                                Finals
                                 {% elif round_num == 100 %}
-                                    Semifinals
-                                {% elif tournament.format in ['round_robin', 'round_robin_playoffs'] and round_num < 100 %}
-                                    Round {{ round_num }}
-                                {% elif tournament.format == 'swiss' %}
-                                    Swiss Round {{ round_num }}
-                                {% elif loop.last %}
-                                    Finals
-                                {% elif loop.index == loop.length - 1 %}
-                                    Semi-Finals
-                                {% else %}
-                                    Round {{ round_num }}
-                                {% endif %}
-                            </h6>
-                            {% for match in matches if match.round_number == round_num %}
-                            <div class="match-card card mb-3 {% if match.is_current %}border-warning{% endif %}">
-                                <div class="card-body p-2">
-                                    <small class="text-muted">
-                                        {% if match.group_name %}{{ match.group_name }}{% else %}Match {{ match.match_number }}{% endif %}
-                                    </small>
-                                    {% if match.is_current %}
-                                    <span class="badge bg-warning text-dark float-end">LIVE</span>
-                                    {% elif match.is_completed %}
-                                    <span class="badge bg-success float-end">Done</span>
-                                    {% endif %}
-                                    
-                                    <div class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team1_id %}text-success{% endif %}">
-                                        <span>{{ match.team1.name if match.team1 else 'TBD' }}</span>
-                                        <strong>{{ match.team1_score }}</strong>
+                                Semifinals
+                                {% elif tournament.format in ['round_robin', 'round_robin_playoffs'] and round_num < 100
+                                    %} Round {{ round_num }} {% elif tournament.format=='swiss' %} Swiss Round {{
+                                    round_num }} {% elif loop.last %} Finals {% elif loop.index==loop.length - 1 %}
+                                    Semi-Finals {% else %} Round {{ round_num }} {% endif %} </h6>
+                                    {% for match in matches if match.round_number == round_num %}
+                                    <div
+                                        class="match-card card mb-3 {% if match.is_current %}border-warning{% endif %}">
+                                        <div class="card-body p-2">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <small class="text-muted">
+                                                    {% if match.group_name %}{{ match.group_name }}{% else %}Match {{
+                                                    match.match_number }}{% endif %}
+                                                </small>
+                                                <div>
+                                                    {% if match.is_current %}
+                                                    <span class="badge bg-warning text-dark me-1">LIVE</span>
+                                                    {% elif match.is_completed %}
+                                                    <span class="badge bg-success me-1">Done</span>
+                                                    {% endif %}
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#editMatchModal{{ match.id }}"
+                                                        title="Edit Match">
+                                                        <i class="bi bi-pencil-square" style="font-size: 0.8rem;"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team1_id %}text-success{% endif %}">
+                                                <span>{{ match.team1.name if match.team1 else 'TBD' }}</span>
+                                                <strong>{{ match.team1_score }}</strong>
+                                            </div>
+                                            <hr class="my-1">
+                                            <div
+                                                class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team2_id %}text-success{% endif %}">
+                                                <span>{{ match.team2.name if match.team2 else 'TBD' }}</span>
+                                                <strong>{{ match.team2_score }}</strong>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <hr class="my-1">
-                                    <div class="team-row d-flex justify-content-between align-items-center py-1 {% if match.winner_id == match.team2_id %}text-success{% endif %}">
-                                        <span>{{ match.team2.name if match.team2 else 'TBD' }}</span>
-                                        <strong>{{ match.team2_score }}</strong>
+
+                                    <!-- Edit Match Modal -->
+                                    <div class="modal fade" id="editMatchModal{{ match.id }}" tabindex="-1"
+                                        aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content bg-dark border-secondary">
+                                                <div class="modal-header border-secondary">
+                                                    <h5 class="modal-title">Edit Match {{ match.match_number }}</h5>
+                                                    <button type="button" class="btn-close btn-close-white"
+                                                        data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form action="{{ url_for('admin.edit_match', match_id=match.id) }}"
+                                                    method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label text-muted">Team 1</label>
+                                                            <div class="input-group">
+                                                                <select
+                                                                    class="form-select bg-dark text-light border-secondary"
+                                                                    name="team1_id">
+                                                                    <option value="">-- TBD --</option>
+                                                                    {% for team in all_teams %}
+                                                                    <option value="{{ team.id }}" {% if
+                                                                        match.team1_id==team.id %}selected{% endif %}>{{
+                                                                        team.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                                <input type="number"
+                                                                    class="form-control bg-dark text-light border-secondary"
+                                                                    name="team1_score" value="{{ match.team1_score }}"
+                                                                    style="max-width: 80px;">
+                                                            </div>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label text-muted">Team 2</label>
+                                                            <div class="input-group">
+                                                                <select
+                                                                    class="form-select bg-dark text-light border-secondary"
+                                                                    name="team2_id">
+                                                                    <option value="">-- TBD --</option>
+                                                                    {% for team in all_teams %}
+                                                                    <option value="{{ team.id }}" {% if
+                                                                        match.team2_id==team.id %}selected{% endif %}>{{
+                                                                        team.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                                <input type="number"
+                                                                    class="form-control bg-dark text-light border-secondary"
+                                                                    name="team2_score" value="{{ match.team2_score }}"
+                                                                    style="max-width: 80px;">
+                                                            </div>
+                                                        </div>
+
+                                                        <hr class="border-secondary">
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label text-muted">Override Status</label>
+                                                            <div class="d-grid gap-2">
+                                                                <button type="submit" name="action" value="set_current"
+                                                                    class="btn btn-outline-warning btn-sm">
+                                                                    <i class="bi bi-play-circle me-1"></i>Force Active
+                                                                    (Set Current)
+                                                                </button>
+                                                                <button type="submit" name="action" value="reset"
+                                                                    class="btn btn-outline-secondary btn-sm">
+                                                                    <i
+                                                                        class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                                                                    (Scores 0-0, Unfinished)
+                                                                </button>
+
+                                                                <div class="input-group mt-2">
+                                                                    <select
+                                                                        class="form-select bg-dark text-light border-secondary form-select-sm"
+                                                                        name="winner_id">
+                                                                        <option value="">Select Winner...</option>
+                                                                        {% if match.team1_id %}<option
+                                                                            value="{{ match.team1_id }}">Winner: {{
+                                                                            match.team1.name }}</option>{% endif %}
+                                                                        {% if match.team2_id %}<option
+                                                                            value="{{ match.team2_id }}">Winner: {{
+                                                                            match.team2.name }}</option>{% endif %}
+                                                                    </select>
+                                                                    <button type="submit" name="action"
+                                                                        value="mark_complete"
+                                                                        class="btn btn-success btn-sm">
+                                                                        <i class="bi bi-check-circle me-1"></i>Complete
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-secondary">
+                                                        <button type="button" class="btn btn-secondary"
+                                                            data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary">Save
+                                                            Changes</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                            {% endfor %}
+                                    {% endfor %}
                         </div>
                         {% endfor %}
                     </div>

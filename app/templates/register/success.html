@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Registration Successful - RobotUprising{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #14141f;
+        background-image: 
+            linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
+        background-size: 50px 50px;
+    }
+    
+    .success-container {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem;
+    }
+    
+    .success-card {
+        background: rgba(37, 37, 56, 0.95);
+        border: 2px solid #28a745;
+        border-radius: 20px;
+        padding: 3rem;
+        text-align: center;
+        max-width: 600px;
+        width: 100%;
+        box-shadow: 0 0 60px rgba(40, 167, 69, 0.2);
+    }
+    
+    .success-icon {
+        font-size: 5rem;
+        color: #28a745;
+        margin-bottom: 1rem;
+    }
+    
+    .success-title {
+        color: #28a745;
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .team-display {
+        background: #1a1a2e;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .team-display-name {
+        color: var(--ru-primary);
+        font-size: 2rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+    
+    .team-display-players {
+        color: var(--ru-muted);
+        font-size: 1.2rem;
+        margin-top: 0.5rem;
+    }
+    
+    .registration-number {
+        display: inline-block;
+        background: var(--ru-primary);
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 50px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-top: 1rem;
+    }
+    
+    .pending-badge {
+        display: inline-block;
+        background: #ffc107;
+        color: #000;
+        padding: 0.5rem 1.5rem;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 1rem;
+    }
+    
+    .info-text {
+        color: var(--ru-muted);
+        margin-top: 1.5rem;
+    }
+    
+    .teams-preview {
+        background: rgba(37, 37, 56, 0.95);
+        border: 1px solid var(--ru-border);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-top: 2rem;
+        max-width: 600px;
+        width: 100%;
+    }
+    
+    .teams-preview h4 {
+        color: var(--ru-primary);
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .team-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: #1a1a2e;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .team-item.highlight {
+        border: 2px solid var(--ru-primary);
+        background: rgba(255, 107, 0, 0.1);
+    }
+    
+    .team-number {
+        background: var(--ru-primary);
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .team-info {
+        flex-grow: 1;
+    }
+    
+    .team-name {
+        font-weight: bold;
+        color: var(--ru-text);
+    }
+    
+    .team-players {
+        color: var(--ru-muted);
+        font-size: 0.85rem;
+    }
+    
+    .btn-home {
+        background: var(--ru-primary);
+        border: none;
+        color: white;
+        padding: 0.75rem 2rem;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 2rem;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+    
+    .btn-home:hover {
+        background: #e05a00;
+        color: white;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="success-container">
+    <div class="success-card">
+        <i class="bi bi-check-circle-fill success-icon"></i>
+        <h1 class="success-title">Registration Successful!</h1>
+        <p class="text-muted">Your team has been registered for</p>
+        <h2 style="color: var(--ru-text);">{{ tournament.name }}</h2>
+        
+        <div class="team-display">
+            <div class="team-display-name">{{ team.name }}</div>
+            <div class="team-display-players">{{ team.player1 }} & {{ team.player2 }}</div>
+        </div>
+        
+        {% if team.is_confirmed %}
+            <div class="registration-number">
+                <i class="bi bi-hash"></i>Team #{{ teams.index(team) + 1 if team in teams else '?' }} of {{ tournament.max_teams }}
+            </div>
+        {% else %}
+            <div class="pending-badge">
+                <i class="bi bi-hourglass-split me-2"></i>Awaiting Admin Confirmation
+            </div>
+        {% endif %}
+        
+        <p class="info-text">
+            {% if tournament.event_date %}
+                <i class="bi bi-calendar me-2"></i>See you on {{ tournament.event_date.strftime('%B %d, %Y') }}!
+            {% else %}
+                <i class="bi bi-clock me-2"></i>Event details will be announced soon.
+            {% endif %}
+        </p>
+        
+        <a href="{{ url_for('main.index') }}" class="btn-home">
+            <i class="bi bi-house me-2"></i>Back to Home
+        </a>
+    </div>
+    
+    {% if teams %}
+    <div class="teams-preview">
+        <h4><i class="bi bi-people-fill me-2"></i>All Registered Teams</h4>
+        {% for t in teams %}
+        <div class="team-item {{ 'highlight' if t.id == team.id else '' }}">
+            <div class="team-number">{{ loop.index }}</div>
+            <div class="team-info">
+                <div class="team-name">{{ t.name }}{% if t.id == team.id %} <span style="color: var(--ru-primary);">(You)</span>{% endif %}</div>
+                <div class="team-players">{{ t.player1 }} & {{ t.player2 }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
