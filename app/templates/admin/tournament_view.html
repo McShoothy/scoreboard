@@ -35,6 +35,7 @@
                 {% if tournament.format == 'round_robin_playoffs' and tournament.current_phase == 'group' %}
                 <form method="POST" action="{{ url_for('admin.advance_to_playoffs', tournament_id=tournament.id) }}"
                     style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-warning"
                         onclick="return confirm('Advance top 4 teams to playoffs?')">
                         <i class="bi bi-arrow-right-circle me-1"></i>Advance Top 4 to Playoffs

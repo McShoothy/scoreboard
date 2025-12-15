@@ -6,12 +6,12 @@
 <style>
     body {
         background-color: #14141f;
-        background-image: 
+        background-image:
             linear-gradient(rgba(255, 107, 0, 0.02) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 107, 0, 0.02) 1px, transparent 1px);
         background-size: 50px 50px;
     }
-    
+
     .register-container {
         min-height: 80vh;
         display: flex;
@@ -20,7 +20,7 @@
         align-items: center;
         padding: 2rem;
     }
-    
+
     .register-card {
         background: rgba(37, 37, 56, 0.95);
         border: 2px solid var(--ru-primary);
@@ -31,7 +31,7 @@
         width: 100%;
         box-shadow: 0 0 60px rgba(255, 107, 0, 0.2);
     }
-    
+
     .code-input {
         font-family: 'Courier New', monospace;
         font-size: 2.5rem;
@@ -47,18 +47,18 @@
         width: 100%;
         transition: all 0.3s;
     }
-    
+
     .code-input:focus {
         outline: none;
         border-color: var(--ru-primary);
         box-shadow: 0 0 20px rgba(255, 107, 0, 0.3);
     }
-    
+
     .code-input::placeholder {
         color: #555;
         letter-spacing: 0.3rem;
     }
-    
+
     .btn-register {
         background: var(--ru-primary);
         border: none;
@@ -73,23 +73,23 @@
         width: 100%;
         margin-top: 1.5rem;
     }
-    
+
     .btn-register:hover {
         background: #e05a00;
         transform: translateY(-2px);
         box-shadow: 0 5px 20px rgba(255, 107, 0, 0.4);
     }
-    
+
     .logo-small {
         margin-bottom: 2rem;
     }
-    
+
     .instruction {
         color: var(--ru-muted);
         font-size: 1.1rem;
         margin-bottom: 1.5rem;
     }
-    
+
     .title {
         color: var(--ru-primary);
         font-size: 2rem;
@@ -107,36 +107,32 @@
         <div class="logo-small">
             <img src="{{ url_for('static', filename='img/RU18_white.png') }}" alt="RobotUprising" height="80">
         </div>
-        
+
         <h1 class="title">Team Registration</h1>
         <p class="instruction">Enter the tournament code to register your team</p>
-        
+
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show"
+            role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
         {% endwith %}
-        
+
         <form action="{{ url_for('register.register_join') }}" method="POST">
-            <input type="text" 
-                   name="code" 
-                   class="code-input" 
-                   placeholder="CODE" 
-                   maxlength="20" 
-                   autocomplete="off"
-                   autocapitalize="characters"
-                   required>
-            
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="code" class="code-input" placeholder="CODE" maxlength="20" autocomplete="off"
+                autocapitalize="characters" required>
+
             <button type="submit" class="btn btn-register">
                 <i class="bi bi-arrow-right-circle me-2"></i>Continue
             </button>
         </form>
-        
+
         <div class="mt-4">
             <a href="{{ url_for('main.index') }}" class="text-muted">
                 <i class="bi bi-arrow-left me-1"></i>Back to Home
