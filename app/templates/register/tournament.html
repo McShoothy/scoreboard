@@ -245,6 +245,7 @@
         </h3>
 
         <form action="{{ url_for('register.register_team') }}" method="POST" id="registration-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="tournament_code" value="{{ tournament.registration_code }}">
 
             <div class="row">
