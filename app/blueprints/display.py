@@ -21,7 +21,7 @@ def display_index():
     tv_session = None
     
     if tv_session_id:
-        tv_session = TVSession.query.get(tv_session_id)
+        tv_session = db.session.get(TVSession, tv_session_id)
         if tv_session and not tv_session.is_active:
             tv_session = None
     
@@ -53,7 +53,7 @@ def display_index():
 @display.route('/tournament/<int:tournament_id>')
 def display_tournament(tournament_id):
     """Display a tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     matches = Match.query.filter_by(tournament_id=tournament_id).order_by(Match.round_number, Match.match_number).all()
     current_match = Match.query.filter_by(tournament_id=tournament_id, is_current=True).first()
     return render_template('display/tournament.html', tournament=tournament, matches=matches, current_match=current_match)
@@ -62,7 +62,7 @@ def display_tournament(tournament_id):
 @display.route('/bracket/<int:tournament_id>')
 def display_bracket(tournament_id):
     """Dedicated bracket display - optimized for TV screens."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     matches = Match.query.filter_by(tournament_id=tournament_id).order_by(Match.round_number, Match.match_number).all()
     teams = Team.query.join(Match, (Match.team1_id == Team.id) | (Match.team2_id == Team.id)).filter(Match.tournament_id == tournament_id).distinct().all()
     return render_template('display/bracket.html', tournament=tournament, matches=matches, teams=teams)
@@ -71,7 +71,7 @@ def display_bracket(tournament_id):
 @display.route('/scoreboard/<int:tournament_id>')
 def display_scoreboard(tournament_id):
     """Display the scoreboard."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     current_match = Match.query.filter_by(tournament_id=tournament_id, is_current=True).first()
     return render_template('display/scoreboard.html', tournament=tournament, current_match=current_match)
 
@@ -79,7 +79,7 @@ def display_scoreboard(tournament_id):
 @display.route('/live/<int:tournament_id>')
 def display_live(tournament_id):
     """Dynamic TV display controlled by iPad remote."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     
     # Create or get TV session
     tv_session_id = session.get('tv_session_id')

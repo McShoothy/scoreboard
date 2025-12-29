@@ -607,6 +607,10 @@
             <i class="bi bi-trophy-fill"></i>
             <span id="win-btn-2">Team 2 Wins</span>
         </button>
+        <button class="btn btn-outline-warning control-btn" onclick="switchSides()">
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Switch Sides</span>
+        </button>
     </div>
 </div>
 
@@ -1344,14 +1348,36 @@
                 tournament_id: tournamentId
             })
         }).then(() => {
-            socket.emit('start_countdown', {
-                tournament_id: tournamentId,
-                timer_duration: timerDuration
-            });
-            currentMode = 'scoreboard';
-            updateModeButtons();
-            document.getElementById('current-mode-badge').textContent = 'Live Scoreboard';
         });
+        currentMode = 'scoreboard';
+        updateModeButtons();
+        document.getElementById('current-mode-badge').textContent = 'Live Scoreboard';
+    });
+    }
+
+    async function switchSides() {
+        if (!currentMatchId) return;
+
+        if (!confirm('Switch teams (Red/Blue) and their scores?')) return;
+
+        try {
+            const response = await fetch(`/api/match/${currentMatchId}/swap-teams`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                // Reload to reflect changes
+                window.location.reload();
+            } else {
+                alert('Failed to switch sides');
+            }
+        } catch (error) {
+            console.error('Error switching sides:', error);
+            alert('Error switching sides');
+        }
     }
 
     function declareWinner(team) {
@@ -1462,7 +1488,7 @@
 
         // Add recommendation highlight
         if (suggestedMode && suggestedMode !== currentMode) {
-            const suggestedBtn = document.querySelector(`.mode-btn[data-mode="${suggestedMode}"]`);
+            const suggestedBtn = document.querySelector(`.mode - btn[data - mode="${suggestedMode}"]`);
             if (suggestedBtn) {
                 suggestedBtn.classList.add('recommended');
             }
@@ -1515,7 +1541,7 @@
             .then(data => {
                 const bracketInfo = document.getElementById('bracket-info');
                 if (data.completed && data.total) {
-                    bracketInfo.textContent = `${data.completed}/${data.total} matches done`;
+                    bracketInfo.textContent = `${data.completed} / ${data.total} matches done`;
                     tournamentState.completedMatches = data.completed;
                     tournamentState.totalMatches = data.total;
                 }

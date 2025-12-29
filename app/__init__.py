@@ -43,6 +43,13 @@ def create_app(config_class=Config):
     csrf.exempt(api)
     csrf.exempt(external_api)
     csrf.exempt(input_bp)  # iPad input often uses AJAX/fetch without CSRF token
+    
+    # Error handlers
+    from flask import render_template
+    
+    @app.errorhandler(404)
+    def not_found_error(error):
+        return render_template('404.html'), 404
 
 
     with app.app_context():

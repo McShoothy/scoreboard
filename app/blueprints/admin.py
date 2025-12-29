@@ -63,7 +63,7 @@ def manage_teams():
 @login_required
 def delete_team(team_id):
     """Delete a team."""
-    team = Team.query.get_or_404(team_id)
+    team = db.get_or_404(Team, team_id)
     db.session.delete(team)
     db.session.commit()
     return redirect(url_for('admin.manage_teams'))
@@ -159,7 +159,7 @@ def manage_tournaments():
 @login_required
 def view_tournament(tournament_id):
     """View tournament details."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     matches = Match.query.filter_by(tournament_id=tournament_id).order_by(Match.round_number, Match.match_number).all()
     
     standings = []
@@ -218,7 +218,7 @@ def calculate_standings(tournament_id):
 @login_required
 def delete_tournament(tournament_id):
     """Delete a tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     Match.query.filter_by(tournament_id=tournament_id).delete()
     db.session.delete(tournament)
     db.session.commit()
@@ -229,7 +229,7 @@ def delete_tournament(tournament_id):
 @login_required
 def advance_to_playoffs(tournament_id):
     """Advance top 4 teams from group stage to playoffs."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     
     if tournament.format != 'round_robin_playoffs':
         return redirect(url_for('admin.view_tournament', tournament_id=tournament_id))
@@ -263,7 +263,7 @@ def advance_to_playoffs(tournament_id):
 @login_required
 def edit_match(match_id):
     """Manually edit match details (teams, scores, state)."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     
     # 1. Update Teams
     team1_id = request.form.get('team1_id')
@@ -355,7 +355,7 @@ def delete_user(user_id):
         flash('Cannot delete your own account', 'error')
         return redirect(url_for('admin.manage_users'))
     
-    admin_user = Admin.query.get_or_404(user_id)
+    admin_user = db.get_or_404(Admin, user_id)
     db.session.delete(admin_user)
     db.session.commit()
     flash(f'Admin {admin_user.username} deleted', 'success')
@@ -366,7 +366,7 @@ def delete_user(user_id):
 @login_required
 def change_user_password(user_id):
     """Change an admin user's password."""
-    admin_user = Admin.query.get_or_404(user_id)
+    admin_user = db.get_or_404(Admin, user_id)
     new_password = request.form.get('password')
     admin_user.set_password(new_password)
     db.session.commit()
@@ -380,7 +380,7 @@ def change_user_password(user_id):
 @login_required
 def admin_tournament_registrations(tournament_id):
     """View and manage tournament registrations."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     teams = Team.query.filter_by(tournament_id=tournament_id).order_by(Team.registered_at).all()
     
     return render_template('admin/registrations.html', tournament=tournament, teams=teams)
@@ -390,7 +390,7 @@ def admin_tournament_registrations(tournament_id):
 @login_required
 def admin_confirm_team(tournament_id, team_id):
     """Confirm a team registration."""
-    team = Team.query.get_or_404(team_id)
+    team = db.get_or_404(Team, team_id)
     if team.tournament_id != tournament_id:
         return jsonify({'success': False, 'error': 'Team not in this tournament'}), 400
     
@@ -409,7 +409,7 @@ def admin_confirm_team(tournament_id, team_id):
 @login_required
 def admin_add_team_to_tournament(tournament_id):
     """Manually add a team to a tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     data = request.get_json()
     
     name = sanitize_team_name(data.get('name', ''))
@@ -451,7 +451,7 @@ def admin_add_team_to_tournament(tournament_id):
 @login_required
 def admin_reject_team(tournament_id, team_id):
     """Reject/remove a team registration."""
-    team = Team.query.get_or_404(team_id)
+    team = db.get_or_404(Team, team_id)
     if team.tournament_id != tournament_id:
         return jsonify({'success': False, 'error': 'Team not in this tournament'}), 400
     
@@ -472,7 +472,7 @@ def admin_reject_team(tournament_id, team_id):
 @login_required
 def admin_checkin_team(tournament_id, team_id):
     """Check in a team on event day."""
-    team = Team.query.get_or_404(team_id)
+    team = db.get_or_404(Team, team_id)
     if team.tournament_id != tournament_id:
         return jsonify({'success': False, 'error': 'Team not in this tournament'}), 400
     
@@ -486,7 +486,7 @@ def admin_checkin_team(tournament_id, team_id):
 @login_required
 def admin_toggle_registration(tournament_id):
     """Toggle registration open/closed."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     tournament.registration_open = not tournament.registration_open
     db.session.commit()
     
@@ -510,7 +510,7 @@ def admin_start_tournament(tournament_id):
         create_round_robin, create_round_robin_playoffs, create_swiss_round
     )
     
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     
     teams = Team.query.filter_by(tournament_id=tournament_id, is_confirmed=True).all()
     team_ids = [t.id for t in teams]
@@ -557,7 +557,7 @@ def admin_start_tournament(tournament_id):
 @login_required
 def admin_regenerate_code(tournament_id):
     """Generate a new registration code."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     tournament.registration_code = Tournament.generate_registration_code()
     db.session.commit()
     

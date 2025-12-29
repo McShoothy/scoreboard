@@ -74,17 +74,17 @@ def create_single_elimination_bracket(tournament_id, team_ids):
             match.is_completed = True
             # Advance winner to next round
             if match.next_match_id:
-                next_match = Match.query.get(match.next_match_id)
+                next_match = db.session.get(Match, match.next_match_id)
                 if next_match:
                     if match.match_number % 2 == 1:
-                        next_match.team1_id = match.team1_id
+                        next_match.team1_id = match.winner_id
                     else:
-                        next_match.team2_id = match.team1_id
+                        next_match.team2_id = match.winner_id
         elif match.team2_id and not match.team1_id:
             match.winner_id = match.team2_id
             match.is_completed = True
             if match.next_match_id:
-                next_match = Match.query.get(match.next_match_id)
+                next_match = db.session.get(Match, match.next_match_id)
                 if next_match:
                     if match.match_number % 2 == 1:
                         next_match.team1_id = match.team2_id
@@ -107,7 +107,7 @@ def create_single_elimination_bracket(tournament_id, team_ids):
 def create_double_elimination_bracket(tournament_id, team_ids):
     """Create double elimination bracket - winners and losers brackets."""
     num_teams = len(team_ids)
-    if num_teams < 3:
+    if num_teams < 2:
         return
     
     team_ids = list(team_ids)
@@ -198,7 +198,7 @@ def create_double_elimination_bracket(tournament_id, team_ids):
 def create_round_robin(tournament_id, team_ids):
     """Create round robin - every team plays every other team."""
     num_teams = len(team_ids)
-    if num_teams < 3:
+    if num_teams < 2:
         return
     
     team_ids = list(team_ids)
@@ -242,7 +242,7 @@ def create_round_robin(tournament_id, team_ids):
 def create_round_robin_playoffs(tournament_id, team_ids):
     """Create round robin group stage followed by top 4 playoffs."""
     num_teams = len(team_ids)
-    if num_teams < 5:
+    if num_teams < 2:
         return
     
     team_ids = list(team_ids)
@@ -320,7 +320,7 @@ def create_round_robin_playoffs(tournament_id, team_ids):
 def create_swiss_round(tournament_id, team_ids, round_num=1):
     """Create a Swiss system round - pair teams with similar records."""
     num_teams = len(team_ids)
-    if num_teams < 4:
+    if num_teams < 2:
         return
     
     team_ids = list(team_ids)

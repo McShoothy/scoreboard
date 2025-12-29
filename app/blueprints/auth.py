@@ -29,7 +29,7 @@ def login_required(f):
 def get_current_admin():
     """Get the currently logged-in admin user."""
     if 'admin_id' in session:
-        return Admin.query.get(session['admin_id'])
+        return db.session.get(Admin, session['admin_id'])
     return None
 
 
@@ -65,7 +65,7 @@ def admin_or_tv_required(f):
         is_tv = False
         if tv_session_id:
             from app.models import TVSession
-            tv = TVSession.query.get(tv_session_id)
+            tv = db.session.get(TVSession, tv_session_id)
             if tv and tv.is_active:
                 is_tv = True
         

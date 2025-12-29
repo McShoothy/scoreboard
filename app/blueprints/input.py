@@ -30,7 +30,7 @@ def input_index():
 @login_required
 def input_tournament(tournament_id):
     """Input controller for a specific tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     current_match = Match.query.filter_by(tournament_id=tournament_id, is_current=True).first()
     matches = Match.query.filter_by(tournament_id=tournament_id, is_completed=False).all()
     return render_template('input/tournament.html', tournament=tournament, current_match=current_match, matches=matches)
@@ -40,7 +40,7 @@ def input_tournament(tournament_id):
 @login_required
 def input_remote(tournament_id):
     """Remote control for a tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     teams = Team.query.all()
     return render_template('input/remote.html', tournament=tournament, teams=teams)
 
@@ -49,7 +49,7 @@ def input_remote(tournament_id):
 @login_required
 def input_ipad(tournament_id):
     """Combined iPad control - scores + TV remote in one interface."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     current_match = Match.query.filter_by(tournament_id=tournament_id, is_current=True).first()
     matches = Match.query.filter_by(tournament_id=tournament_id).order_by(Match.round_number, Match.match_number).all()
     teams = Team.query.all()
@@ -61,5 +61,5 @@ def input_ipad(tournament_id):
 @login_required
 def input_match(match_id):
     """Input for a specific match."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     return render_template('input/match.html', match=match)

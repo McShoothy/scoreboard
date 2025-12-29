@@ -32,7 +32,7 @@ def get_or_create_display_state():
 @admin_or_tv_required
 def get_match(match_id):
     """Get match details."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     return jsonify(match.to_dict())
 
 
@@ -40,7 +40,7 @@ def get_match(match_id):
 @api_login_required
 def update_score(match_id):
     """Update match score."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     data = request.get_json()
     
     if 'team1_score' in data:
@@ -59,11 +59,41 @@ def update_score(match_id):
     return jsonify(match.to_dict())
 
 
+@api.route('/match/<int:match_id>/swap-teams', methods=['POST'])
+@api_login_required
+def swap_teams(match_id):
+    """Swap team 1 and team 2 (ids and scores)."""
+    match = db.get_or_404(Match, match_id)
+    
+    # Swap IDs
+    temp_id = match.team1_id
+    match.team1_id = match.team2_id
+    match.team2_id = temp_id
+    
+    # Swap scores
+    temp_score = match.team1_score
+    match.team1_score = match.team2_score
+    match.team2_score = temp_score
+    
+    db.session.commit()
+    
+    # Emit update using the standard score_update event (or full match update)
+    # Using 'match_swap' as a specific event might be clearer for clients
+    socketio.emit('score_update', {
+        'match_id': match_id,
+        'team1_score': match.team1_score,
+        'team2_score': match.team2_score,
+        'swap': True
+    })
+    
+    return jsonify(match.to_dict())
+
+
 @api.route('/match/<int:match_id>/complete', methods=['POST'])
 @api_login_required
 def complete_match(match_id):
     """Complete a match with a winner."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     data = request.get_json()
     
     winner_id = data.get('winner_id')
@@ -73,7 +103,7 @@ def complete_match(match_id):
     
     # Advance winner to next match
     if match.next_match_id:
-        next_match = Match.query.with_for_update().get(match.next_match_id)
+        next_match = db.session.get(Match, match.next_match_id, with_for_update=True)
         if next_match:
             if next_match.team1_id is None:
                 next_match.team1_id = winner_id
@@ -99,8 +129,8 @@ def complete_match(match_id):
     # Prepare response data
     next_match_data = None
     if next_current:
-        team1 = Team.query.get(next_current.team1_id) if next_current.team1_id else None
-        team2 = Team.query.get(next_current.team2_id) if next_current.team2_id else None
+        team1 = db.session.get(Team, next_current.team1_id) if next_current.team1_id else None
+        team2 = db.session.get(Team, next_current.team2_id) if next_current.team2_id else None
         next_match_data = {
             'match_id': next_current.id,
             'round': next_current.round_number,
@@ -108,7 +138,7 @@ def complete_match(match_id):
             'team2': team2.to_dict() if team2 else None
         }
     
-    winner_team = Team.query.get(winner_id) if winner_id else None
+    winner_team = db.session.get(Team, winner_id) if winner_id else None
     winner_data = winner_team.to_dict() if winner_team else None
     
     socketio.emit('match_complete', {
@@ -126,7 +156,7 @@ def complete_match(match_id):
 @api_login_required
 def set_current_match(match_id):
     """Set a match as the current match."""
-    match = Match.query.get_or_404(match_id)
+    match = db.get_or_404(Match, match_id)
     
     Match.query.filter_by(tournament_id=match.tournament_id, is_current=True).update({'is_current': False})
     match.is_current = True
@@ -149,7 +179,7 @@ def get_bracket(tournament_id):
 @admin_or_tv_required
 def get_next_match(tournament_id):
     """Get the next upcoming match, prioritizing team continuity."""
-    Tournament.query.get_or_404(tournament_id)
+    db.get_or_404(Tournament, tournament_id)
     
     # 1. Find all playable matches
     playable_matches = Match.query.filter(
@@ -204,7 +234,7 @@ def get_next_match(tournament_id):
 @admin_or_tv_required
 def get_tournament_stats(tournament_id):
     """Get tournament statistics."""
-    Tournament.query.get_or_404(tournament_id)
+    db.get_or_404(Tournament, tournament_id)
     
     total_matches = Match.query.filter_by(tournament_id=tournament_id).count()
     completed_matches = Match.query.filter_by(tournament_id=tournament_id, is_completed=True).count()
@@ -222,7 +252,7 @@ def get_tournament_stats(tournament_id):
 @api.route('/tournament/<int:tournament_id>/timer', methods=['POST'])
 def update_tournament_timer(tournament_id):
     """Update tournament timer duration."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     data = request.get_json()
     
     if 'timer_duration' in data:
@@ -236,7 +266,7 @@ def update_tournament_timer(tournament_id):
 @admin_or_tv_required
 def api_get_tournament_teams(tournament_id):
     """Get all teams in a tournament."""
-    tournament = Tournament.query.get_or_404(tournament_id)
+    tournament = db.get_or_404(Tournament, tournament_id)
     teams = Team.query.filter_by(tournament_id=tournament_id).order_by(Team.registered_at).all()
     
     return jsonify({
@@ -254,7 +284,7 @@ def get_display_state():
     result = state.to_dict()
     
     if state.tournament_id:
-        tournament = Tournament.query.get(state.tournament_id)
+        tournament = db.session.get(Tournament, state.tournament_id)
         if tournament:
             result['tournament'] = tournament.to_dict()
             current_match = Match.query.filter_by(tournament_id=state.tournament_id, is_current=True).first()
@@ -262,8 +292,8 @@ def get_display_state():
                 result['current_match'] = current_match.to_dict()
                 
                 if state.mode == 'waiting':
-                    team1 = Team.query.get(current_match.team1_id) if current_match.team1_id else None
-                    team2 = Team.query.get(current_match.team2_id) if current_match.team2_id else None
+                    team1 = db.session.get(Team, current_match.team1_id) if current_match.team1_id else None
+                    team2 = db.session.get(Team, current_match.team2_id) if current_match.team2_id else None
                     result['next_match'] = {
                         'match_id': current_match.id,
                         'round': current_match.round_number,
@@ -290,7 +320,7 @@ def get_display_state():
                         }
     
     if hasattr(state, 'winner_team_id') and state.winner_team_id:
-        winner = Team.query.get(state.winner_team_id)
+        winner = db.session.get(Team, state.winner_team_id)
         if winner:
             result['winner_team'] = winner.to_dict()
     
@@ -626,3 +656,91 @@ def api_register_team():
         'confirmed': team.is_confirmed,
         'message': 'Awaiting admin confirmation' if not team.is_confirmed else 'Successfully registered'
     })
+
+
+# ==================== Test API ====================
+
+@api.route('/test/generate-brackets', methods=['POST'])
+@api_login_required
+def test_generate_brackets():
+    """Test bracket generation for all formats and team counts."""
+    from app.blueprints.bracket import (
+        create_single_elimination_bracket,
+        create_double_elimination_bracket,
+        create_round_robin,
+        create_round_robin_playoffs,
+        create_swiss_round
+    )
+    
+    formats = {
+        'single_elimination': create_single_elimination_bracket,
+        'double_elimination': create_double_elimination_bracket,
+        'round_robin': create_round_robin,
+        'round_robin_playoffs': create_round_robin_playoffs,
+        'swiss': create_swiss_round
+    }
+    
+    team_counts = [2, 3, 4, 64]
+    results = {}
+    
+    for fmt_name, fmt_func in formats.items():
+        results[fmt_name] = {}
+        
+        for count in team_counts:
+            # Create temp tournament
+            t = Tournament(
+                name=f'Test {fmt_name} {count}',
+                format=fmt_name,
+                owner_id=session.get('admin_id', 1)
+            )
+            db.session.add(t)
+            db.session.commit()
+            
+            try:
+                # Create teams
+                team_ids = []
+                for i in range(count):
+                    team = Team(
+                        name=f'T{i+1}', 
+                        player1=f'P{i+1}a', 
+                        player2=f'P{i+1}b', 
+                        tournament_id=t.id
+                    )
+                    db.session.add(team)
+                    db.session.commit()
+                    team_ids.append(team.id)
+                
+                # Generate bracket
+                fmt_func(t.id, team_ids)
+                
+                # Collect results
+                matches = Match.query.filter_by(tournament_id=t.id).order_by(Match.round_number, Match.match_number).all()
+                
+                match_data = []
+                for m in matches:
+                    match_data.append({
+                        'round': m.round_number,
+                        'match_num': m.match_number,
+                        'type': m.match_type,
+                        'team1': m.team1.name if m.team1 else 'BYE/TBD',
+                        'team2': m.team2.name if m.team2 else 'BYE/TBD',
+                        'next_match_id': m.next_match_id
+                    })
+                
+                results[fmt_name][count] = {
+                    'match_count': len(matches),
+                    'matches': match_data
+                }
+                
+            except Exception as e:
+                results[fmt_name][count] = {
+                    'error': str(e)
+                }
+            finally:
+                # Cleanup
+                Match.query.filter_by(tournament_id=t.id).delete()
+                Team.query.filter_by(tournament_id=t.id).delete()
+                db.session.delete(t)
+                db.session.commit()
+                
+    return jsonify(results)

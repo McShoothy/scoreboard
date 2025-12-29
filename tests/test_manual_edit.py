@@ -43,7 +43,7 @@ def test_manual_match_edit(client, admin_user):
     
     assert resp.status_code == 200
     
-    updated_match = Match.query.get(m.id)
+    updated_match = db.session.get(Match, m.id)
     assert updated_match.team2_id == team3.id
     
     # 2. Edit scores
@@ -54,7 +54,7 @@ def test_manual_match_edit(client, admin_user):
         'team2_score': 5
     })
     
-    updated_match = Match.query.get(m.id)
+    updated_match = db.session.get(Match, m.id)
     assert updated_match.team1_score == 10
     assert updated_match.team2_score == 5
     
@@ -66,6 +66,6 @@ def test_manual_match_edit(client, admin_user):
         'team2_id': team3.id
     })
     
-    updated_match = Match.query.get(m.id)
+    updated_match = db.session.get(Match, m.id)
     assert updated_match.is_completed == True
     assert updated_match.winner_id == team1.id

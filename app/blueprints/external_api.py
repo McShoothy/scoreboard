@@ -67,7 +67,7 @@ def get_or_create_display_state():
 @require_token('tournament:read')
 def get_tournament(tournament_id):
     """Get tournament information."""
-    tournament = Tournament.query.get(tournament_id)
+    tournament = db.session.get(Tournament, tournament_id)
     if not tournament:
         return jsonify({'error': 'Tournament not found'}), 404
     
@@ -81,7 +81,7 @@ def get_tournament(tournament_id):
 @require_token('match:read')
 def get_current_match(tournament_id):
     """Get the current active match for a tournament."""
-    tournament = Tournament.query.get(tournament_id)
+    tournament = db.session.get(Tournament, tournament_id)
     if not tournament:
         return jsonify({'error': 'Tournament not found'}), 404
     
@@ -104,7 +104,7 @@ def get_current_match(tournament_id):
 @require_token('team:read')
 def get_tournament_teams(tournament_id):
     """Get all teams in a tournament."""
-    tournament = Tournament.query.get(tournament_id)
+    tournament = db.session.get(Tournament, tournament_id)
     if not tournament:
         return jsonify({'error': 'Tournament not found'}), 404
     
@@ -122,7 +122,7 @@ def get_tournament_teams(tournament_id):
 @require_token('match:read')
 def get_match(match_id):
     """Get match details."""
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if not match:
         return jsonify({'error': 'Match not found'}), 404
     
@@ -141,7 +141,7 @@ def update_match_score(match_id):
     
     Body: {"team1_score": 5, "team2_score": 3}
     """
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if not match:
         return jsonify({'error': 'Match not found'}), 404
     
@@ -181,7 +181,7 @@ def add_point(match_id):
     
     Body: {"team": 1} or {"team": 2}
     """
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if not match:
         return jsonify({'error': 'Match not found'}), 404
     
@@ -226,7 +226,7 @@ def set_winner_auto(match_id):
     
     Body: {} (empty) or {"force_team": 1} to force a specific winner
     """
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if not match:
         return jsonify({'error': 'Match not found'}), 404
     
@@ -277,7 +277,7 @@ def set_winner_auto(match_id):
     db.session.commit()
     
     # Emit real-time update
-    winner_team = Team.query.get(winner_id)
+    winner_team = db.session.get(Team, winner_id)
     socketio.emit('match_complete', {
         'match_id': match_id,
         'winner_id': winner_id,
@@ -303,7 +303,7 @@ def complete_match(match_id):
     
     Body: {"winner_id": 5}
     """
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if not match:
         return jsonify({'error': 'Match not found'}), 404
     
@@ -345,7 +345,7 @@ def complete_match(match_id):
     db.session.commit()
     
     # Emit real-time update
-    winner_team = Team.query.get(winner_id)
+    winner_team = db.session.get(Team, winner_id)
     socketio.emit('match_complete', {
         'match_id': match_id,
         'winner_id': winner_id,
@@ -413,7 +413,7 @@ def start_countdown():
         return jsonify({'error': 'tournament_id is required'}), 400
     
     # Get tournament for default duration
-    tournament = Tournament.query.get(tournament_id)
+    tournament = db.session.get(Tournament, tournament_id)
     if not tournament:
         return jsonify({'error': 'Tournament not found'}), 404
     

@@ -67,7 +67,7 @@ def handle_start_countdown(data):
 def handle_score_update(data):
     """Handle score update from iPad."""
     match_id = data['match_id']
-    match = Match.query.get(match_id)
+    match = db.session.get(Match, match_id)
     if match:
         if 'team1_score' in data:
             match.team1_score = data['team1_score']

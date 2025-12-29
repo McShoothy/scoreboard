@@ -117,7 +117,7 @@ def register_team():
 def register_success(code, team_id):
     """Registration success page."""
     tournament = Tournament.query.filter_by(registration_code=code.upper()).first()
-    team = Team.query.get(team_id)
+    team = db.session.get(Team, team_id)
     
     if not tournament or not team:
         return redirect(url_for('register.register_index'))
